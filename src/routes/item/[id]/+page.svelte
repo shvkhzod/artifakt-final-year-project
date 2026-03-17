@@ -167,7 +167,7 @@
 	.top-bar {
 		position: sticky;
 		top: 0;
-		z-index: 100;
+		z-index: var(--z-drop-overlay);
 		padding: var(--space-sm) var(--space-lg);
 		background: rgba(0, 0, 0, 0.75);
 		backdrop-filter: blur(16px);
@@ -178,7 +178,6 @@
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-xs);
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		color: var(--text-secondary);
 		text-decoration: none;
@@ -235,7 +234,7 @@
 		font-family: var(--font-display);
 		font-style: italic;
 		font-size: var(--text-xl);
-		line-height: 1.5;
+		line-height: var(--leading-normal);
 		color: var(--text-primary);
 		margin: 0;
 	}
@@ -243,7 +242,6 @@
 	.quote-author {
 		display: block;
 		margin-top: var(--space-md);
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		color: var(--text-tertiary);
 		font-style: normal;
@@ -255,19 +253,12 @@
 	}
 
 	.article-title {
-		font-family: var(--font-display);
-		font-size: var(--text-3xl);
-		font-weight: 400;
-		line-height: 1.2;
 		color: var(--text-primary);
-		letter-spacing: -0.02em;
 		margin-bottom: var(--space-md);
 	}
 
 	.article-excerpt {
-		font-family: var(--font-body);
 		font-size: var(--text-base);
-		line-height: 1.6;
 		color: var(--text-secondary);
 		margin-bottom: var(--space-md);
 	}
@@ -276,7 +267,6 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		color: var(--accent-sage);
 		text-decoration: none;
@@ -293,11 +283,8 @@
 	}
 
 	.item-title {
-		font-family: var(--font-display);
 		font-size: var(--text-2xl);
-		font-weight: 400;
 		color: var(--text-primary);
-		letter-spacing: -0.02em;
 		margin-bottom: var(--space-sm);
 	}
 
@@ -305,7 +292,6 @@
 		display: flex;
 		align-items: center;
 		gap: var(--space-xs);
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		color: var(--text-tertiary);
 		margin-bottom: var(--space-sm);
@@ -323,7 +309,6 @@
 		display: inline-flex;
 		align-items: center;
 		gap: var(--space-xs);
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		color: var(--text-secondary);
 		background: rgba(255, 255, 255, 0.04);
@@ -352,7 +337,6 @@
 	}
 
 	.tag {
-		font-family: var(--font-body);
 		font-size: var(--text-xs);
 		color: var(--text-secondary);
 		background: rgba(255, 255, 255, 0.06);
@@ -374,16 +358,14 @@
 		font-family: var(--font-body);
 		font-size: var(--text-2xs);
 		font-weight: 500;
-		letter-spacing: 0.12em;
+		letter-spacing: var(--tracking-wide);
 		text-transform: uppercase;
 		color: var(--text-tertiary);
 		margin-bottom: var(--space-sm);
 	}
 
 	.note-text {
-		font-family: var(--font-body);
 		font-size: var(--text-base);
-		line-height: 1.6;
 		color: var(--text-secondary);
 	}
 
@@ -437,16 +419,14 @@
 	}
 
 	.similar-type {
-		font-family: var(--font-body);
 		font-size: var(--text-2xs);
 		font-weight: 500;
 		text-transform: uppercase;
-		letter-spacing: 0.1em;
+		letter-spacing: var(--tracking-wide);
 		color: var(--text-tertiary);
 	}
 
 	.similar-title {
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		color: var(--text-primary);
 		display: -webkit-box;
@@ -460,7 +440,6 @@
 		position: absolute;
 		top: var(--space-xs);
 		right: var(--space-xs);
-		font-family: var(--font-body);
 		font-size: var(--text-2xs);
 		font-weight: 500;
 		color: var(--text-primary);

@@ -102,7 +102,7 @@
 		top: 0;
 		left: 0;
 		right: 0;
-		z-index: 500;
+		z-index: var(--z-navbar);
 		background: rgba(0, 0, 0, 0.55);
 		backdrop-filter: blur(20px);
 		-webkit-backdrop-filter: blur(20px);
@@ -123,7 +123,7 @@
 		font-size: var(--text-xl);
 		font-weight: 400;
 		color: var(--text-primary);
-		letter-spacing: -0.02em;
+		letter-spacing: var(--tracking-tight);
 		text-decoration: none;
 		user-select: none;
 		flex-shrink: 0;
@@ -137,7 +137,6 @@
 	}
 
 	.nav-link {
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		font-weight: 500;
 		color: var(--text-tertiary);
@@ -187,14 +186,13 @@
 	}
 
 	.kbd-hint {
-		font-family: var(--font-body);
 		font-size: var(--text-2xs);
 		font-weight: 500;
 		color: var(--text-ghost);
 		border: 1px solid rgba(255, 255, 255, 0.08);
 		border-radius: 4px;
 		padding: 1px 5px;
-		line-height: 1.3;
+		line-height: var(--leading-snug);
 	}
 
 	.avatar-placeholder {
@@ -237,7 +235,6 @@
 	}
 
 	.mobile-nav-link {
-		font-family: var(--font-body);
 		font-size: var(--text-base);
 		font-weight: 500;
 		color: var(--text-tertiary);

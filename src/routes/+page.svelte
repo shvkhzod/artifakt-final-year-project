@@ -275,14 +275,14 @@
 	/* ── Cluster Filters ─────────────────────────── */
 	.cluster-filters {
 		position: fixed;
-		top: 64px;
+		top: calc(var(--navbar-height) + var(--space-xl));
 		left: 50%;
 		transform: translateX(-50%);
-		z-index: 400;
+		z-index: var(--z-panel);
 		display: flex;
 		align-items: center;
-		gap: 6px;
-		padding: 6px;
+		gap: var(--space-2xs);
+		padding: var(--space-2xs);
 		background: rgba(0, 0, 0, 0.6);
 		backdrop-filter: blur(16px);
 		-webkit-backdrop-filter: blur(16px);
@@ -293,7 +293,7 @@
 	.filter-pill {
 		display: inline-flex;
 		align-items: center;
-		gap: 6px;
+		gap: var(--space-2xs);
 		padding: 5px 14px;
 		border: none;
 		border-radius: var(--radius-full);
@@ -328,7 +328,7 @@
 	/* ── Library ─────────────────────────────────── */
 	.library {
 		min-height: 100vh;
-		padding: 120px var(--space-lg) var(--space-3xl);
+		padding: calc(var(--navbar-height) + var(--space-3xl)) var(--space-lg) var(--space-3xl);
 		background: var(--bg-void);
 	}
 
@@ -428,7 +428,7 @@
 		font-family: var(--font-display);
 		font-style: italic;
 		font-size: var(--text-sm);
-		line-height: 1.6;
+		line-height: var(--leading-normal);
 		color: var(--text-primary);
 		display: -webkit-box;
 		-webkit-line-clamp: 5;
@@ -456,7 +456,7 @@
 		font-size: var(--text-sm);
 		font-weight: 600;
 		color: var(--text-primary);
-		line-height: 1.35;
+		line-height: var(--leading-snug);
 		margin-bottom: var(--space-2xs);
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
@@ -468,7 +468,7 @@
 	.article-desc {
 		font-family: var(--font-body);
 		font-size: var(--text-xs);
-		line-height: 1.5;
+		line-height: var(--leading-normal);
 		color: var(--text-secondary);
 		display: -webkit-box;
 		-webkit-line-clamp: 3;
@@ -482,7 +482,7 @@
 		font-family: var(--font-body);
 		font-size: var(--text-2xs);
 		color: var(--text-tertiary);
-		letter-spacing: 0.02em;
+		letter-spacing: var(--tracking-wide);
 	}
 
 	/* ── FAB ─────────────────────────────────────── */
@@ -490,7 +490,7 @@
 		position: fixed;
 		bottom: var(--space-xl);
 		right: var(--space-xl);
-		z-index: 200;
+		z-index: var(--z-fab);
 		width: 52px;
 		height: 52px;
 		border-radius: var(--radius-full);
@@ -522,7 +522,7 @@
 		background: rgba(0, 0, 0, 0.85);
 		display: grid;
 		place-items: center;
-		z-index: 100;
+		z-index: var(--z-drop-overlay);
 		backdrop-filter: blur(8px);
 		animation: fadeIn var(--duration-fast) var(--ease-out);
 	}
@@ -566,7 +566,7 @@
 		}
 
 		.library {
-			padding: 110px var(--space-sm) var(--space-2xl);
+			padding: calc(var(--navbar-height) + var(--space-2xl)) var(--space-sm) var(--space-2xl);
 		}
 	}
 

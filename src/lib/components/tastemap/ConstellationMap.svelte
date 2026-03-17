@@ -760,7 +760,7 @@
 
 	.tooltip {
 		position: fixed;
-		z-index: 500;
+		z-index: var(--z-navbar);
 		pointer-events: none;
 		display: flex;
 		flex-direction: column;
@@ -775,24 +775,21 @@
 	}
 
 	.tooltip-type {
-		font-family: var(--font-body);
 		font-size: var(--text-2xs);
 		font-weight: 500;
-		letter-spacing: 0.08em;
+		letter-spacing: var(--tracking-wide);
 		text-transform: uppercase;
 		color: var(--text-tertiary);
 	}
 
 	.tooltip-title {
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		font-weight: 500;
 		color: var(--text-primary);
-		line-height: 1.3;
+		line-height: var(--leading-snug);
 	}
 
 	.tooltip-cluster {
-		font-family: var(--font-body);
 		font-size: var(--text-xs);
 		font-weight: 500;
 	}

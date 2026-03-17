@@ -15,6 +15,7 @@
 	}
 </script>
 
+<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
 <article class="image-card" tabindex="0" role="button" onkeydown={handleKeydown}>
 	<div class="image-wrapper">
 		<img {src} alt={title || 'Saved image'} loading="lazy" />
@@ -88,7 +89,7 @@
 		font-size: var(--text-sm);
 		font-weight: 500;
 		color: var(--text-primary);
-		line-height: 1.3;
+		line-height: var(--leading-snug);
 	}
 
 	.tags {

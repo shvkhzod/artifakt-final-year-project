@@ -17,6 +17,7 @@
 	}
 </script>
 
+<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
 <article class="article-card" tabindex="0" role="button" onkeydown={handleKeydown}>
 	{#if thumbnailUrl}
 		<div class="thumbnail">
@@ -96,13 +97,12 @@
 		font-size: var(--text-base);
 		font-weight: 600;
 		color: var(--text-primary);
-		line-height: 1.3;
+		line-height: var(--leading-snug);
 	}
 
 	.description {
 		font-size: var(--text-sm);
 		color: var(--text-secondary);
-		line-height: 1.5;
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
 		line-clamp: 2;

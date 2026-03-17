@@ -15,6 +15,7 @@
 	}
 </script>
 
+<!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
 <article class="quote-card" tabindex="0" role="button" onkeydown={handleKeydown} style={clusterColor ? `--accent: var(--cluster-${clusterColor})` : '--accent: var(--border-light)'}>
 	<span class="quote-mark">&ldquo;</span>
 	<blockquote class="quote-text">{content}</blockquote>
@@ -57,7 +58,7 @@
 		font-style: italic;
 		font-size: var(--text-lg);
 		color: var(--text-primary);
-		line-height: 1.5;
+		line-height: var(--leading-normal);
 		margin-top: var(--space-md);
 		margin-bottom: var(--space-md);
 	}

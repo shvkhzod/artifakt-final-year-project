@@ -47,7 +47,7 @@
 		border-radius: var(--radius-md);
 		font-size: var(--text-sm);
 		color: var(--text-primary);
-		z-index: 9999;
+		z-index: var(--z-toast);
 		animation: slideUp var(--duration-normal) var(--ease-out);
 		border-left: 3px solid var(--text-tertiary);
 	}

@@ -191,6 +191,7 @@
 	class:reduced-motion={prefersReducedMotion}
 	bind:this={containerEl}
 	role="grid"
+	tabindex="0"
 	aria-label="Activity heatmap"
 	onkeydown={handleHeatmapKeydown}
 >
@@ -308,7 +309,7 @@
 	/* ── Tooltip ──────────────────────────────────────── */
 	.heatmap-tooltip {
 		position: fixed;
-		z-index: 500;
+		z-index: var(--z-navbar);
 		pointer-events: none;
 		display: flex;
 		flex-direction: column;
@@ -322,14 +323,12 @@
 	}
 
 	.heatmap-tooltip-count {
-		font-family: var(--font-body);
 		font-size: var(--text-xs);
 		font-weight: 500;
 		color: var(--text-primary);
 	}
 
 	.heatmap-tooltip-date {
-		font-family: var(--font-body);
 		font-size: var(--text-2xs);
 		color: var(--text-tertiary);
 	}

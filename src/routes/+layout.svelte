@@ -126,12 +126,11 @@
 		position: absolute;
 		top: -100%;
 		left: var(--space-md);
-		z-index: 9999;
+		z-index: var(--z-toast);
 		padding: var(--space-xs) var(--space-md);
 		background: var(--accent-sage);
-		color: white;
+		color: var(--text-on-accent);
 		border-radius: var(--radius-sm);
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		text-decoration: none;
 	}
@@ -145,6 +144,6 @@
 	}
 
 	.app-content {
-		padding-top: 56px; /* NavBar height */
+		padding-top: var(--navbar-height);
 	}
 </style>

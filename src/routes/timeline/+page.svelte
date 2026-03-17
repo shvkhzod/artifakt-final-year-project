@@ -272,8 +272,13 @@
 		<section class="section insights-section" aria-label="Insights">
 			<h2 class="section-title">Insights</h2>
 			<div class="insights-grid">
-				{#each insights as insight (insight.type)}
-					<article class="insight-card" style="--accent: {insight.color}">
+				{#each insights as insight, idx (insight.type)}
+					<article
+						class="insight-card"
+						class:insight-featured={idx === 0}
+						style="--accent: {insight.color}"
+					>
+						<span class="insight-dot" style="background: {insight.color}"></span>
 						<h3 class="insight-title">{insight.title}</h3>
 						<p class="insight-description">{insight.description}</p>
 					</article>
@@ -286,11 +291,20 @@
 			<h2 class="section-title">Activity</h2>
 			<ActivityHeatmap data={heatmapData} />
 			<div class="activity-stats">
-				<span>{totalItems} items saved</span>
-				<span class="stat-sep">&middot;</span>
-				<span>{activeDays} active days</span>
-				<span class="stat-sep">&middot;</span>
-				<span>{longestStreak()} day longest streak</span>
+				<div class="stat">
+					<span class="stat-value">{totalItems}</span>
+					<span class="stat-label">items saved</span>
+				</div>
+				<span class="stat-sep"></span>
+				<div class="stat">
+					<span class="stat-value">{activeDays}</span>
+					<span class="stat-label">active days</span>
+				</div>
+				<span class="stat-sep"></span>
+				<div class="stat">
+					<span class="stat-value">{longestStreak()}</span>
+					<span class="stat-label">day streak</span>
+				</div>
 			</div>
 		</section>
 
@@ -320,11 +334,8 @@
 	}
 
 	.page-title {
-		font-family: var(--font-display);
 		font-size: var(--text-2xl);
-		font-weight: 400;
 		color: var(--text-primary);
-		letter-spacing: -0.02em;
 		user-select: none;
 	}
 
@@ -369,23 +380,29 @@
 		padding: var(--space-xl) var(--space-lg);
 	}
 
-	/* ── Sections ─────────────────────────────────────── */
+	/* ── Sections — varied rhythm ────────────────────── */
 	.section {
 		margin-bottom: var(--space-3xl);
 	}
 
 	.section-title {
-		font-family: var(--font-display);
-		font-size: var(--text-2xl);
-		font-weight: 400;
 		color: var(--text-primary);
-		letter-spacing: -0.02em;
 		margin-bottom: var(--space-lg);
 	}
 
-	/* ── Stream Section ───────────────────────────────── */
+	/* Stream section: hero content — most visual weight, generous bottom space */
 	.stream-section {
+		margin-bottom: 5rem;
+	}
+
+	/* Insights: moderate separation */
+	.insights-section {
 		margin-bottom: var(--space-3xl);
+	}
+
+	/* Activity: tighter — data-dense, leads into the closer */
+	.activity-section {
+		margin-bottom: var(--space-xl);
 	}
 
 	/* ── Legend ─────────────────────────────────────────── */
@@ -416,7 +433,6 @@
 	}
 
 	.legend-name {
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		color: var(--text-secondary);
 	}
@@ -424,22 +440,40 @@
 	/* ── Insight Cards ─────────────────────────────────── */
 	.insights-grid {
 		display: grid;
-		grid-template-columns: repeat(3, 1fr);
+		grid-template-columns: 1fr 1fr;
 		gap: var(--space-md);
 	}
 
 	.insight-card {
 		background: var(--bg-surface-2);
 		border: 1px solid var(--border-subtle);
-		border-left: 3px solid var(--accent);
 		border-radius: var(--radius-md);
 		padding: var(--space-lg);
-		transition: border-color var(--duration-fast) var(--ease-out);
+		transition: border-color var(--duration-fast) var(--ease-out),
+			background var(--duration-fast) var(--ease-out);
+	}
+
+	/* First insight spans full width — featured item breaks the grid */
+	.insight-featured {
+		grid-column: 1 / -1;
+		padding: var(--space-xl) var(--space-lg);
+	}
+
+	.insight-featured .insight-title {
+		font-size: var(--text-base);
 	}
 
 	.insight-card:hover {
 		border-color: var(--border-light);
-		border-left-color: var(--accent);
+		background: var(--bg-surface-1);
+	}
+
+	.insight-dot {
+		display: block;
+		width: 6px;
+		height: 6px;
+		border-radius: var(--radius-full);
+		margin-bottom: var(--space-sm);
 	}
 
 	.insight-title {
@@ -451,32 +485,51 @@
 	}
 
 	.insight-description {
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		color: var(--text-secondary);
-		line-height: 1.55;
+		line-height: var(--leading-normal);
 		margin: 0;
 	}
 
-	/* ── Activity Section ──────────────────────────────── */
+	/* ── Activity Stats ──────────────────────────────── */
 	.activity-stats {
 		display: flex;
-		align-items: center;
-		gap: var(--space-xs);
-		margin-top: var(--space-md);
-		font-family: var(--font-body);
+		align-items: baseline;
+		gap: var(--space-lg);
+		margin-top: var(--space-lg);
+	}
+
+	.stat {
+		display: flex;
+		align-items: baseline;
+		gap: var(--space-2xs);
+	}
+
+	.stat-value {
+		font-size: var(--text-lg);
+		font-weight: 600;
+		color: var(--text-primary);
+		letter-spacing: var(--tracking-tight);
+	}
+
+	.stat-label {
 		font-size: var(--text-sm);
 		color: var(--text-tertiary);
 	}
 
 	.stat-sep {
-		color: var(--text-ghost);
+		width: 1px;
+		height: 16px;
+		background: var(--border-subtle);
+		align-self: center;
 	}
 
 	/* ── Closer ──────────────────────────────────────── */
 	.closer {
 		text-align: center;
-		padding: var(--space-3xl) 0;
+		padding: 5rem 0 var(--space-3xl);
+		border-top: 1px solid var(--border-subtle);
+		margin-top: var(--space-2xl);
 	}
 
 	.closer-text {
@@ -495,6 +548,15 @@
 
 		.insights-grid {
 			grid-template-columns: 1fr;
+			gap: var(--space-sm);
+		}
+
+		.insight-featured {
+			padding: var(--space-lg);
+		}
+
+		.activity-stats {
+			gap: var(--space-md);
 		}
 
 		.sub-header {

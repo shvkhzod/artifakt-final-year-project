@@ -419,7 +419,7 @@
 		font-family: var(--font-body);
 		font-size: var(--text-2xs);
 		font-weight: 500;
-		letter-spacing: 0.02em;
+		letter-spacing: var(--tracking-wide);
 		opacity: 0.75;
 	}
 
@@ -434,7 +434,7 @@
 	/* ── Tooltip ─────────────────────────────────────── */
 	.stream-tooltip {
 		position: fixed;
-		z-index: 500;
+		z-index: var(--z-navbar);
 		pointer-events: none;
 		display: flex;
 		flex-direction: column;
@@ -448,14 +448,12 @@
 	}
 
 	.stream-tooltip-name {
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		font-weight: 500;
 		color: var(--text-primary);
 	}
 
 	.stream-tooltip-value {
-		font-family: var(--font-body);
 		font-size: var(--text-xs);
 		color: var(--text-secondary);
 	}

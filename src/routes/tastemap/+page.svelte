@@ -169,12 +169,11 @@
 		position: fixed;
 		top: 68px;
 		right: var(--space-lg);
-		z-index: 200;
+		z-index: var(--z-fab);
 		pointer-events: none;
 	}
 
 	.item-count {
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		color: var(--text-tertiary);
 		background: rgba(255, 255, 255, 0.04);
@@ -190,8 +189,7 @@
 		bottom: var(--space-xl);
 		left: 50%;
 		transform: translateX(-50%);
-		z-index: 200;
-		font-family: var(--font-body);
+		z-index: var(--z-fab);
 		font-size: var(--text-xs);
 		color: var(--text-tertiary);
 		background: rgba(15, 15, 16, 0.7);

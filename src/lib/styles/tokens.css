@@ -42,6 +42,16 @@
   --text-2xl: 1.9375rem; /* 31px */
   --text-3xl: 2.4375rem; /* 39px */
 
+  /* Leading (line-height) */
+  --leading-tight: 1.2;     /* Headings, display text */
+  --leading-snug: 1.35;     /* Sub-headings, card titles */
+  --leading-normal: 1.6;    /* Body text, descriptions */
+
+  /* Tracking (letter-spacing) */
+  --tracking-tight: -0.02em;  /* Display headings */
+  --tracking-normal: 0;       /* Body text */
+  --tracking-wide: 0.08em;    /* Uppercase labels, badges */
+
   /* Spacing (8pt grid) */
   --space-2xs: 0.25rem;  /* 4px */
   --space-xs: 0.5rem;    /* 8px */
@@ -64,4 +74,18 @@
   --duration-fast: 150ms;
   --duration-normal: 300ms;
   --duration-slow: 500ms;
+
+  /* Z-Index Scale (semantic layers) */
+  --z-drop-overlay: 100;
+  --z-fab: 200;
+  --z-sticky: 300;
+  --z-panel: 400;
+  --z-navbar: 500;
+  --z-backdrop: 900;
+  --z-overlay: 950;
+  --z-modal: 1000;
+  --z-toast: 1100;
+
+  /* Layout */
+  --navbar-height: 56px;
 }

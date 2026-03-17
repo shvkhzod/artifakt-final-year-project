@@ -177,7 +177,7 @@
 	.backdrop {
 		position: fixed;
 		inset: 0;
-		z-index: 300;
+		z-index: var(--z-sticky);
 		background: rgba(0, 0, 0, 0.3);
 		animation: fadeIn var(--duration-fast) var(--ease-out);
 	}
@@ -188,7 +188,7 @@
 		top: 0;
 		right: 0;
 		bottom: 0;
-		z-index: 400;
+		z-index: var(--z-panel);
 		width: 360px;
 		max-width: 100vw;
 		background: var(--bg-surface-1);
@@ -246,10 +246,9 @@
 		border-radius: var(--radius-full);
 		background: rgba(255, 255, 255, 0.04);
 		color: var(--text-tertiary);
-		font-family: var(--font-body);
 		font-size: var(--text-2xs);
 		font-weight: 500;
-		letter-spacing: 0.08em;
+		letter-spacing: var(--tracking-wide);
 		text-transform: uppercase;
 		width: fit-content;
 	}
@@ -272,11 +271,10 @@
 
 	/* ── Title ─────────────────────────────────────── */
 	.panel-title {
-		font-family: var(--font-display);
 		font-size: var(--text-xl);
 		font-weight: 400;
 		color: var(--text-primary);
-		line-height: 1.3;
+		line-height: var(--leading-snug);
 		letter-spacing: -0.01em;
 	}
 
@@ -291,14 +289,12 @@
 		font-family: var(--font-display);
 		font-style: italic;
 		font-size: var(--text-lg);
-		line-height: 1.6;
 		color: var(--text-primary);
 	}
 
 	.panel-quote cite {
 		display: block;
 		margin-top: var(--space-sm);
-		font-family: var(--font-body);
 		font-style: normal;
 		font-size: var(--text-sm);
 		color: var(--text-tertiary);
@@ -306,9 +302,7 @@
 
 	/* ── Description ───────────────────────────────── */
 	.panel-description {
-		font-family: var(--font-body);
 		font-size: var(--text-base);
-		line-height: 1.6;
 		color: var(--text-secondary);
 	}
 
@@ -317,7 +311,6 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 6px;
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		color: var(--accent-sage);
 		text-decoration: none;
@@ -336,10 +329,9 @@
 	}
 
 	.section-label {
-		font-family: var(--font-body);
 		font-size: var(--text-2xs);
 		font-weight: 500;
-		letter-spacing: 0.1em;
+		letter-spacing: var(--tracking-wide);
 		text-transform: uppercase;
 		color: var(--text-tertiary);
 	}
@@ -349,7 +341,6 @@
 		align-items: center;
 		padding: 3px var(--space-sm);
 		border-radius: var(--radius-full);
-		font-family: var(--font-body);
 		font-size: var(--text-xs);
 		font-weight: 500;
 		color: var(--pill-color);
@@ -365,7 +356,6 @@
 	}
 
 	.meta-value {
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		color: var(--text-secondary);
 	}
@@ -378,9 +368,7 @@
 	}
 
 	.note-text {
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
-		line-height: 1.5;
 		color: var(--text-secondary);
 		padding: var(--space-sm);
 		background: rgba(255, 255, 255, 0.03);

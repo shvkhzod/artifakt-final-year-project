@@ -169,7 +169,7 @@
 	.search-backdrop {
 		position: fixed;
 		inset: 0;
-		z-index: 900;
+		z-index: var(--z-backdrop);
 		background: rgba(0, 0, 0, 0.7);
 		animation: fadeIn var(--duration-fast) var(--ease-out);
 	}
@@ -178,7 +178,7 @@
 	.search-overlay {
 		position: fixed;
 		inset: 0;
-		z-index: 950;
+		z-index: var(--z-overlay);
 		display: flex;
 		align-items: flex-start;
 		justify-content: center;
@@ -257,7 +257,6 @@
 	}
 
 	.search-status-text {
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		color: var(--text-tertiary);
 	}
@@ -268,14 +267,12 @@
 	}
 
 	.search-empty-text {
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		color: var(--text-secondary);
 		margin-bottom: var(--space-xs);
 	}
 
 	.search-empty-hint {
-		font-family: var(--font-body);
 		font-size: var(--text-xs);
 		color: var(--text-tertiary);
 	}

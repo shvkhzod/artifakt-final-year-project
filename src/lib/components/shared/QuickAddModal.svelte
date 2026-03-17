@@ -328,7 +328,7 @@
 	.modal-backdrop {
 		position: fixed;
 		inset: 0;
-		z-index: 1000;
+		z-index: var(--z-modal);
 		background: rgba(0, 0, 0, 0.7);
 		backdrop-filter: blur(4px);
 		display: grid;
@@ -433,7 +433,7 @@
 	.textarea {
 		resize: vertical;
 		min-height: 120px;
-		line-height: 1.5;
+		line-height: var(--leading-normal);
 	}
 
 	.attribution {
@@ -497,11 +497,10 @@
 	}
 
 	.preview-title {
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 		font-weight: 500;
 		color: var(--text-primary);
-		line-height: 1.3;
+		line-height: var(--leading-snug);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -536,7 +535,6 @@
 	}
 
 	.drop-text {
-		font-family: var(--font-body);
 		font-size: var(--text-sm);
 	}
 
