@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="popup.css">
+  <title>Aina</title>
+</head>
+<body>
+  <div id="app" class="popup">
+    <!-- States managed by popup.js -->
+    <div id="state-saving" class="state">
+      <div class="spinner"></div>
+      <p class="status-text">Saving...</p>
+    </div>
+
+    <div id="state-success" class="state" hidden>
+      <div class="checkmark-container">
+        <svg class="checkmark" viewBox="0 0 52 52">
+          <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none"/>
+          <path class="checkmark-check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+        </svg>
+      </div>
+      <p class="status-text">Saved to Aina</p>
+      <div id="detected-tags" class="tags-container"></div>
+    </div>
+
+    <div id="state-duplicate" class="state" hidden>
+      <div class="icon-container">
+        <svg class="icon-exists" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+      </div>
+      <p class="status-text">Already in your library</p>
+    </div>
+
+    <div id="state-error" class="state" hidden>
+      <p class="status-text error-text">Couldn't save</p>
+      <p class="status-sub">Queued for later</p>
+    </div>
+
+    <div id="state-offline" class="state" hidden>
+      <p class="status-text">You're offline</p>
+      <p class="status-sub">Saved to queue — will sync when online</p>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
