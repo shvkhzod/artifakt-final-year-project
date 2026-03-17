@@ -1,11 +1,18 @@
 import type { PageServerLoad } from './$types';
 import { getItemById, getItemTags, searchSimilarItems } from '$lib/server/db/queries';
 import { error } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
+import { db, isDbAvailable } from '$lib/server/db';
 import { itemClusters, clusters } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
+import { getDemoItem } from '$lib/utils/demoData';
 
 export const load: PageServerLoad = async ({ params }) => {
+	if (!(await isDbAvailable())) {
+		const demo = getDemoItem(params.id);
+		if (demo) return demo;
+		throw error(404, 'Item not found');
+	}
+
 	let item;
 	try {
 		item = await getItemById(params.id);

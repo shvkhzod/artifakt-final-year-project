@@ -1,5 +1,7 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
+	import * as appStore from '$lib/stores/appStore.svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -19,6 +21,17 @@
 			day: 'numeric',
 		});
 	}
+
+	function handleBack(e: MouseEvent) {
+		e.preventDefault();
+		if (!document.startViewTransition) {
+			goto('/');
+			return;
+		}
+		// Tell the Library page which card to tag for the reverse morph
+		appStore.setViewTransitionItemId(data.item.id);
+		document.startViewTransition(() => goto('/'));
+	}
 </script>
 
 <svelte:head>
@@ -28,7 +41,7 @@
 <div class="item-page">
 	<!-- Top bar -->
 	<header class="top-bar">
-		<a href="/" class="back-link" aria-label="Back to Library">
+		<a href="/" class="back-link" aria-label="Back to Library" onclick={handleBack}>
 			<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
 				<path d="m15 18-6-6 6-6" />
 			</svg>
@@ -41,7 +54,7 @@
 		<div class="item-hero">
 			{#if data.item.type === 'image' || data.item.type === 'screenshot'}
 				{#if data.item.url || data.item.thumbnailUrl}
-					<div class="hero-image-wrap">
+					<div class="hero-image-wrap" style="view-transition-name: item-hero">
 						<img
 							src={data.item.url || data.item.thumbnailUrl}
 							alt={data.item.title || 'Saved image'}
@@ -50,7 +63,7 @@
 					</div>
 				{/if}
 			{:else if data.item.type === 'quote'}
-				<div class="hero-quote">
+				<div class="hero-quote" style="view-transition-name: item-hero">
 					<span class="quote-mark">&ldquo;</span>
 					<blockquote class="quote-text">{data.item.content}</blockquote>
 					{#if data.item.note}
@@ -58,9 +71,9 @@
 					{/if}
 				</div>
 			{:else if data.item.type === 'article'}
-				<div class="hero-article">
+				<div class="hero-article" style="view-transition-name: item-hero">
 					{#if data.item.title}
-						<h1 class="article-title">{data.item.title}</h1>
+						<h1 class="article-title" style="view-transition-name: item-title">{data.item.title}</h1>
 					{/if}
 					{#if data.item.content}
 						<p class="article-excerpt">{data.item.content}</p>
@@ -82,7 +95,7 @@
 		<!-- Meta row -->
 		<div class="meta-row">
 			{#if data.item.title && data.item.type !== 'article'}
-				<h1 class="item-title">{data.item.title}</h1>
+				<h1 class="item-title" style="view-transition-name: item-title">{data.item.title}</h1>
 			{/if}
 
 			<div class="meta-details">
@@ -92,7 +105,7 @@
 			</div>
 
 			{#if data.cluster}
-				<div class="meta-cluster" style="--cluster-color: {data.cluster.color}">
+				<div class="meta-cluster" style="--cluster-color: {data.cluster.color}; view-transition-name: item-cluster">
 					<span class="cluster-dot"></span>
 					<span class="cluster-name">{data.cluster.name}</span>
 					<span class="cluster-confidence">

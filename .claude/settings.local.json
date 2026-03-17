@@ -7,7 +7,11 @@
       "Bash(pkill:*)",
       "Bash(netstat:*)",
       "Bash(taskkill:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npx svelte-check:*)",
+      "Bash(npx vite:*)",
+      "Bash(sed -i \"s|style={isActive\\(link.href, $page.url.pathname\\) ? ''view-transition-name: nav-indicator'' : ''''}||\" src/lib/components/shared/NavBar.svelte)",
+      "Bash(sed -i 's|style=\"\"view-transition-name: navbar\"\"||' src/lib/components/shared/NavBar.svelte)"
     ]
   }
 }

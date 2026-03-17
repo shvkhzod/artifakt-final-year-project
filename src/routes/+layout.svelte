@@ -5,12 +5,59 @@
 	import '$lib/styles/animations.css';
 	import '$lib/styles/utils.css';
 
+	import { onNavigate } from '$app/navigation';
 	import NavBar from '$lib/components/shared/NavBar.svelte';
 	import SearchOverlay from '$lib/components/shared/SearchOverlay.svelte';
 	import { Toast, QuickAddModal } from '$lib/components/shared';
 	import * as appStore from '$lib/stores/appStore.svelte';
 
 	let { children } = $props();
+
+	// ── Page transition direction ───────────────────
+	// Routes ordered spatially left → right
+	const routeOrder: Record<string, number> = {
+		'/': 0,
+		'/tastemap': 1,
+		'/timeline': 2,
+	};
+
+	function getRouteIndex(pathname: string): number {
+		if (pathname.startsWith('/item/')) return -1; // item detail handled separately
+		return routeOrder[pathname] ?? -1;
+	}
+
+	onNavigate((navigation) => {
+		if (!document.startViewTransition) return;
+
+		const from = navigation.from?.url.pathname ?? '';
+		const to = navigation.to?.url.pathname ?? '';
+
+		// Item detail transitions are handled by the card click handler
+		if (from.startsWith('/item/') || to.startsWith('/item/')) return;
+
+		const fromIdx = getRouteIndex(from);
+		const toIdx = getRouteIndex(to);
+
+		// Only animate between known main pages
+		if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+
+		// Set direction on <html> so our view-transition CSS can read it
+		const direction = toIdx > fromIdx ? 'forward' : 'backward';
+		document.documentElement.dataset.vtDirection = direction;
+
+		return new Promise((resolve) => {
+			const transition = document.startViewTransition!(async () => {
+				resolve();
+				await navigation.complete;
+			});
+			// Clean up direction attribute after transition completes
+			transition.finished.then(() => {
+				delete document.documentElement.dataset.vtDirection;
+			}).catch(() => {
+				delete document.documentElement.dataset.vtDirection;
+			});
+		});
+	});
 
 	function isURL(text: string): boolean {
 		return /^https?:\/\/.+/i.test(text.trim());

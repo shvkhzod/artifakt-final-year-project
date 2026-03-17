@@ -111,3 +111,15 @@ export async function performSearch(query: string) {
 		}
 	}, 300);
 }
+
+// ── View Transition state ──
+// Shared between Library and Item Detail for hero morph continuity
+let _viewTransitionItemId: string | null = $state(null);
+
+export function getViewTransitionItemId() {
+	return _viewTransitionItemId;
+}
+
+export function setViewTransitionItemId(id: string | null) {
+	_viewTransitionItemId = id;
+}

@@ -26,15 +26,40 @@
 	function closeMobileMenu() {
 		mobileMenuOpen = false;
 	}
+
+	// ── Sliding indicator ────────────────────────
+	let linksContainer: HTMLDivElement | undefined = $state();
+	let indicatorStyle = $state('');
+
+	function updateIndicator() {
+		if (!linksContainer) return;
+		const activeEl = linksContainer.querySelector('.nav-link.active') as HTMLElement | null;
+		if (!activeEl) {
+			indicatorStyle = 'opacity: 0';
+			return;
+		}
+		const containerRect = linksContainer.getBoundingClientRect();
+		const activeRect = activeEl.getBoundingClientRect();
+		const left = activeRect.left - containerRect.left;
+		indicatorStyle = `width: ${activeRect.width}px; transform: translateX(${left}px); opacity: 1`;
+	}
+
+	$effect(() => {
+		// Re-run when pathname changes
+		$page.url.pathname;
+		// Wait a tick for the DOM to update active classes
+		requestAnimationFrame(updateIndicator);
+	});
 </script>
 
-<nav class="navbar" aria-label="Main navigation">
+<nav class="navbar" aria-label="Main navigation" style="view-transition-name: navbar">
 	<div class="navbar-inner">
 		<!-- Left: Logo -->
 		<a href="/" class="navbar-logo">Aina</a>
 
 		<!-- Center: Nav links (desktop) -->
-		<div class="navbar-links">
+		<div class="navbar-links" bind:this={linksContainer}>
+			<span class="nav-indicator" style={indicatorStyle} aria-hidden="true"></span>
 			{#each navLinks as link}
 				<a
 					href={link.href}
@@ -113,7 +138,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: var(--space-sm) var(--space-lg);
+		padding: var(--space-sm) var(--space-3xl);
 		max-width: 100%;
 	}
 
@@ -131,30 +156,45 @@
 
 	/* ── Nav Links (desktop) ───────────────────── */
 	.navbar-links {
+		position: relative;
 		display: flex;
 		align-items: center;
 		gap: var(--space-xs);
 	}
 
+	/* Sliding pill that follows the active link */
+	.nav-indicator {
+		position: absolute;
+		top: 0;
+		left: 0;
+		height: 100%;
+		border-radius: var(--radius-full);
+		background: rgba(255, 255, 255, 0.06);
+		transition: transform 320ms cubic-bezier(0.25, 0.1, 0.0, 1),
+			width 320ms cubic-bezier(0.25, 0.1, 0.0, 1),
+			opacity 200ms ease;
+		pointer-events: none;
+		will-change: transform, width;
+	}
+
 	.nav-link {
+		position: relative;
+		z-index: 1;
 		font-size: var(--text-sm);
 		font-weight: 500;
 		color: var(--text-tertiary);
 		text-decoration: none;
 		padding: 6px 14px;
 		border-radius: var(--radius-full);
-		transition: color var(--duration-fast) var(--ease-out),
-			background var(--duration-fast) var(--ease-out);
+		transition: color var(--duration-fast) var(--ease-out);
 	}
 
 	.nav-link:hover {
 		color: var(--text-secondary);
-		background: rgba(255, 255, 255, 0.04);
 	}
 
 	.nav-link.active {
 		color: var(--text-primary);
-		background: rgba(255, 255, 255, 0.06);
 	}
 
 	/* ── Actions ───────────────────────────────── */

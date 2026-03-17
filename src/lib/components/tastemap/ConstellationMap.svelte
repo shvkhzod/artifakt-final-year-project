@@ -283,8 +283,15 @@
 
 	/* ── Three.js scene ──────────────────────────── */
 
+	// Snapshot nodes outside $effect to prevent reactive re-runs
+	// when the parent's derived value re-evaluates with the same data
+	let prevNodesRef: typeof nodes | null = null;
+
 	$effect(() => {
 		if (!canvasEl || !containerEl || nodes.length === 0) return;
+		// Skip re-run if nodes haven't actually changed
+		if (prevNodesRef === nodes) return;
+		prevNodesRef = nodes;
 
 		const scene = new THREE.Scene();
 
@@ -628,11 +635,11 @@
 
 		// ── Animation loop ──
 		let frameId: number;
-		const clock = new THREE.Clock();
+		const startTime = performance.now();
 
 		function animate() {
 			frameId = requestAnimationFrame(animate);
-			const elapsed = clock.getElapsedTime();
+			const elapsed = (performance.now() - startTime) / 1000;
 
 			// Auto-rotate
 			if (autoRotate && !prefersReducedMotion) {

@@ -1,9 +1,13 @@
 import type { PageServerLoad } from './$types';
 import { getItems, getClusters } from '$lib/server/db/queries';
-import { db } from '$lib/server/db';
+import { db, isDbAvailable } from '$lib/server/db';
 import { itemClusters } from '$lib/server/db/schema';
 
 export const load: PageServerLoad = async () => {
+	if (!(await isDbAvailable())) {
+		return { weeks: [], streams: [], clusters: [], items: [], heatmapData: [], totalItems: 0 };
+	}
+
 	try {
 	const [items, clusters, assignments] = await Promise.all([
 		getItems({ limit: 2000 }),

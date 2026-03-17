@@ -75,8 +75,24 @@
 		return gridItems.filter((item) => item.cluster?.id === appStore.getSelectedClusterId());
 	});
 
+	// Track which card is transitioning — only that card gets view-transition-name.
+	// Reads from shared store so back-navigation from Item Detail can tag the right card.
+	let transitioningId: string | null = $derived(appStore.getViewTransitionItemId());
+
 	function handleItemClick(itemId: string) {
-		goto(`/item/${itemId}`);
+		if (!document.startViewTransition) {
+			goto(`/item/${itemId}`);
+			return;
+		}
+
+		// Tag the clicked card, wait one frame for the DOM to update, then transition
+		appStore.setViewTransitionItemId(itemId);
+		requestAnimationFrame(() => {
+			document.startViewTransition!(() => {
+				appStore.setViewTransitionItemId(null);
+				return goto(`/item/${itemId}`);
+			});
+		});
 	}
 
 	function extractDomain(url: string | null): string {
@@ -208,36 +224,39 @@
 >
 	<div class="grid">
 		{#each visibleItems as item (item.id)}
+			{@const isTransitioning = transitioningId === item.id}
+			{@const clusterCol = item.cluster?.color || 'rgba(255,255,255,0.06)'}
 			<button
 				class="grid-card"
-				style="--cluster-col: {item.cluster?.color || 'rgba(255,255,255,0.1)'}"
+				class:card-type-image={item.type === 'image' || item.type === 'screenshot'}
+				class:card-type-quote={item.type === 'quote'}
+				class:card-type-article={item.type === 'article'}
+				style="--cluster-col: {clusterCol}"
 				onclick={() => handleItemClick(item.id)}
 			>
 				{#if item.type === 'image' || item.type === 'screenshot'}
-					<div class="card-image">
+					<div class="card-image" style={isTransitioning ? 'view-transition-name: item-hero' : ''}>
 						<img
 							src={item.url || item.thumbnailUrl}
 							alt={item.title || 'Saved image'}
 							loading="lazy"
 							draggable="false"
 						/>
+						<span class="image-edge" aria-hidden="true"></span>
 					</div>
 					{#if item.title}
-						<div class="card-footer">
-							<span class="card-title">{item.title}</span>
-						</div>
+						<span class="image-caption" style={isTransitioning ? 'view-transition-name: item-title' : ''}>{item.title}</span>
 					{/if}
 				{:else if item.type === 'quote'}
-					<div class="card-quote">
-						<span class="quote-mark">&ldquo;</span>
+					<div class="card-quote" style={isTransitioning ? 'view-transition-name: item-hero' : ''}>
 						<p class="quote-text">{item.content}</p>
 						{#if item.note}
-							<span class="quote-author">&mdash; {item.note}</span>
+							<span class="quote-author">{item.note}</span>
 						{/if}
 					</div>
 				{:else if item.type === 'article'}
-					<div class="card-article">
-						<h4 class="article-title">{item.title}</h4>
+					<div class="card-article" style={isTransitioning ? 'view-transition-name: item-hero' : ''}>
+						<h4 class="article-title" style={isTransitioning ? 'view-transition-name: item-title' : ''}>{item.title}</h4>
 						{#if item.content}
 							<p class="article-desc">{item.content}</p>
 						{/if}
@@ -245,9 +264,6 @@
 							<span class="article-source">{extractDomain(item.url)}</span>
 						{/if}
 					</div>
-				{/if}
-				{#if item.cluster}
-					<span class="cluster-dot" style="background: {item.cluster.color}"></span>
 				{/if}
 			</button>
 		{/each}
@@ -335,154 +351,195 @@
 	/* ── Masonry Grid ────────────────────────────── */
 	.grid {
 		columns: 4;
-		column-gap: var(--space-md);
+		column-gap: 20px;
 		max-width: 1400px;
 		margin: 0 auto;
 	}
 
-	/* ── Card (shared) ───────────────────────────── */
+	/* ── Card (shared base) ──────────────────────── */
 	.grid-card {
 		position: relative;
 		display: block;
 		width: 100%;
 		break-inside: avoid;
-		margin-bottom: var(--space-md);
+		margin-bottom: 20px;
 		border: none;
 		padding: 0;
-		border-radius: var(--radius-md);
-		background: var(--bg-surface-1);
-		overflow: hidden;
+		background: transparent;
 		cursor: pointer;
 		text-align: left;
-		transition: transform var(--duration-fast) var(--ease-out),
-			box-shadow var(--duration-normal) var(--ease-out);
+		font-family: inherit;
+		outline: none;
 	}
 
-	.grid-card:hover {
-		transform: translateY(-2px);
-		box-shadow:
-			0 8px 30px -8px rgba(0, 0, 0, 0.6),
-			0 0 0 1px rgba(255, 255, 255, 0.06);
+	/* Keyboard focus — subtle ring in sage */
+	.grid-card:focus-visible {
+		outline: 2px solid var(--accent-sage);
+		outline-offset: 4px;
+		border-radius: 4px;
 	}
 
-	/* ── Cluster dot indicator ───────────────────── */
-	.cluster-dot {
-		position: absolute;
-		top: var(--space-xs);
-		right: var(--space-xs);
-		width: 6px;
-		height: 6px;
-		border-radius: var(--radius-full);
-		opacity: 0.7;
-		pointer-events: none;
-	}
-
-	/* ── Image Card ──────────────────────────────── */
-	.card-image {
+	/* ─────────────────────────────────────────────
+	   IMAGE / SCREENSHOT CARDS
+	   Gallery prints. Crisp edges. The image
+	   carries all the visual weight.
+	   ───────────────────────────────────────────── */
+	.card-type-image .card-image {
+		position: relative;
 		line-height: 0;
+		border-radius: 4px;
+		overflow: hidden;
+		/* Vignette gives depth, like a printed photograph */
+		box-shadow: inset 0 -40px 40px -30px rgba(0, 0, 0, 0.25);
 	}
 
-	.card-image img {
+	.card-type-image .card-image img {
 		width: 100%;
 		display: block;
 		object-fit: cover;
-		transition: transform var(--duration-slow) var(--ease-out);
+		transition: transform 600ms var(--ease-out);
 	}
 
-	.grid-card:hover .card-image img {
-		transform: scale(1.03);
+	/* Bottom edge — cluster color bleeds in on hover */
+	.image-edge {
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		height: 2px;
+		background: var(--cluster-col);
+		opacity: 0;
+		transition: opacity 400ms var(--ease-out);
 	}
 
-	.card-footer {
-		padding: var(--space-sm) var(--space-sm);
+	.card-type-image:hover .image-edge {
+		opacity: 0.8;
 	}
 
-	.card-title {
-		font-family: var(--font-body);
-		font-size: var(--text-xs);
-		font-weight: 500;
-		color: var(--text-secondary);
-		display: -webkit-box;
-		-webkit-line-clamp: 1;
-		line-clamp: 1;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
+	.card-type-image:hover .card-image img {
+		transform: scale(1.025);
 	}
 
-	/* ── Quote Card ──────────────────────────────── */
-	.card-quote {
-		padding: var(--space-lg) var(--space-md);
-		border-left: 3px solid var(--cluster-col);
-	}
-
-	.quote-mark {
-		font-family: var(--font-display);
-		font-size: var(--text-2xl);
-		line-height: 1;
-		color: var(--text-ghost);
+	/* Caption — sits below, whisper-quiet */
+	.image-caption {
 		display: block;
-		margin-bottom: var(--space-xs);
+		padding: 8px 2px 0;
+		font-family: var(--font-body);
+		font-size: 11px;
+		letter-spacing: 0.02em;
+		color: var(--text-ghost);
+		transition: color 400ms var(--ease-out);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.card-type-image:hover .image-caption {
+		color: var(--text-tertiary);
+	}
+
+	/* ─────────────────────────────────────────────
+	   QUOTE CARDS
+	   Editorial typography. The words are the art.
+	   A subtle surface gives them presence without
+	   boxing them in.
+	   ───────────────────────────────────────────── */
+	.card-quote {
+		padding: 24px 20px 22px 20px;
+		background: rgba(255, 255, 255, 0.018);
+		border-radius: 4px;
+		transition: background 400ms var(--ease-out);
+	}
+
+	.card-type-quote:hover .card-quote {
+		background: rgba(255, 255, 255, 0.035);
 	}
 
 	.quote-text {
 		font-family: var(--font-display);
 		font-style: italic;
-		font-size: var(--text-sm);
-		line-height: var(--leading-normal);
-		color: var(--text-primary);
+		font-size: var(--text-base);
+		line-height: 1.6;
+		color: rgba(255, 255, 255, 0.72);
+		margin: 0;
 		display: -webkit-box;
-		-webkit-line-clamp: 5;
-		line-clamp: 5;
+		-webkit-line-clamp: 6;
+		line-clamp: 6;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
+		transition: color 400ms var(--ease-out);
+	}
+
+	.card-type-quote:hover .quote-text {
+		color: rgba(255, 255, 255, 0.85);
 	}
 
 	.quote-author {
 		display: block;
-		margin-top: var(--space-sm);
+		margin-top: 14px;
 		font-family: var(--font-body);
-		font-size: var(--text-2xs);
-		font-style: normal;
+		font-size: 11px;
+		font-weight: 500;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
 		color: var(--text-tertiary);
 	}
 
-	/* ── Article Card ────────────────────────────── */
+	/* ─────────────────────────────────────────────
+	   ARTICLE CARDS
+	   Reading list. Serif title gives editorial
+	   weight. A faint surface and top accent make
+	   them feel placed, not dumped.
+	   ───────────────────────────────────────────── */
 	.card-article {
-		padding: var(--space-md);
+		padding: 18px 18px 16px;
+		background: rgba(255, 255, 255, 0.015);
+		border-radius: 4px;
+		transition: background 300ms var(--ease-out);
+	}
+
+	.card-type-article:hover .card-article {
+		background: rgba(255, 255, 255, 0.03);
 	}
 
 	.article-title {
-		font-family: var(--font-body);
-		font-size: var(--text-sm);
-		font-weight: 600;
+		font-family: var(--font-display);
+		font-size: var(--text-base);
+		font-weight: 400;
 		color: var(--text-primary);
-		line-height: var(--leading-snug);
-		margin-bottom: var(--space-2xs);
+		line-height: 1.35;
+		margin-bottom: 8px;
+		transition: color 300ms var(--ease-out);
+	}
+
+	.card-type-article:hover .article-title {
+		color: #fff;
+	}
+
+	.article-desc {
+		font-family: var(--font-body);
+		font-size: 12px;
+		line-height: 1.55;
+		color: var(--text-tertiary);
 		display: -webkit-box;
 		-webkit-line-clamp: 2;
 		line-clamp: 2;
 		-webkit-box-orient: vertical;
 		overflow: hidden;
-	}
-
-	.article-desc {
-		font-family: var(--font-body);
-		font-size: var(--text-xs);
-		line-height: var(--leading-normal);
-		color: var(--text-secondary);
-		display: -webkit-box;
-		-webkit-line-clamp: 3;
-		line-clamp: 3;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
-		margin-bottom: var(--space-xs);
+		margin: 0 0 10px;
 	}
 
 	.article-source {
 		font-family: var(--font-body);
-		font-size: var(--text-2xs);
+		font-size: 10px;
+		font-weight: 500;
+		letter-spacing: 0.06em;
+		color: var(--text-ghost);
+		transition: color 300ms var(--ease-out);
+	}
+
+	.card-type-article:hover .article-source {
 		color: var(--text-tertiary);
-		letter-spacing: var(--tracking-wide);
 	}
 
 	/* ── FAB ─────────────────────────────────────── */
@@ -558,15 +615,23 @@
 	@media (max-width: 768px) {
 		.grid {
 			columns: 2;
-			column-gap: var(--space-sm);
+			column-gap: 14px;
 		}
 
 		.grid-card {
-			margin-bottom: var(--space-sm);
+			margin-bottom: 14px;
 		}
 
 		.library {
 			padding: calc(var(--navbar-height) + var(--space-2xl)) var(--space-sm) var(--space-2xl);
+		}
+
+		.card-quote {
+			padding: 18px 14px 16px 16px;
+		}
+
+		.card-article {
+			padding: 14px 12px 12px;
 		}
 	}
 
