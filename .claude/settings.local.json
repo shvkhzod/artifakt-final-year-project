@@ -11,7 +11,8 @@
       "Bash(npx svelte-check:*)",
       "Bash(npx vite:*)",
       "Bash(sed -i \"s|style={isActive\\(link.href, $page.url.pathname\\) ? ''view-transition-name: nav-indicator'' : ''''}||\" src/lib/components/shared/NavBar.svelte)",
-      "Bash(sed -i 's|style=\"\"view-transition-name: navbar\"\"||' src/lib/components/shared/NavBar.svelte)"
+      "Bash(sed -i 's|style=\"\"view-transition-name: navbar\"\"||' src/lib/components/shared/NavBar.svelte)",
+      "Bash(bash \"C:/Users/lucky/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.4/skills/brainstorming/scripts/start-server.sh\" --project-dir \"/c/Another Disk/The FIles/Projects/coding/server/aina\")"
     ]
   }
 }
