@@ -1,8 +1,18 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { onMount } from 'svelte';
+	import { goto, invalidateAll } from '$app/navigation';
 	import type { ItemType } from '$lib/utils/types';
-	import { getClusterColor } from '$lib/utils/colors';
 	import * as appStore from '$lib/stores/appStore.svelte';
+	import EmptyState from '$lib/components/shared/EmptyState.svelte';
+
+	let prefersReducedMotion = false;
+	let canHover = false;
+
+	onMount(() => {
+		appStore.setSearchContext({ page: 'library' });
+		prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		canHover = window.matchMedia('(hover: hover)').matches;
+	});
 
 	// Accept server data if available (from +page.server.ts)
 	let { data }: { data?: { items?: any[]; clusters?: any[] } } = $props();
@@ -24,39 +34,8 @@
 		color: string;
 	}
 
-	function makeCluster(name: string): { id: string; name: string; color: string } {
-		const id = name.toLowerCase().replace(/\s+/g, '-');
-		return { id, name, color: getClusterColor(name) };
-	}
-
-	const demoItems: GridItem[] = [
-		{ id: '1', type: 'image', title: 'Morning Light on Concrete', content: null, url: 'https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=600', thumbnailUrl: null, note: null, cluster: makeCluster('Visual Aesthetics') },
-		{ id: '7', type: 'quote', title: 'On Simplicity', content: 'Perfection is achieved, not when there is nothing more to add, but when there is nothing left to take away.', url: null, thumbnailUrl: null, note: 'Antoine de Saint-Exupéry', cluster: makeCluster('Design Philosophy') },
-		{ id: '2', type: 'image', title: 'Foggy Mountain Ridge', content: null, url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=600', thumbnailUrl: null, note: null, cluster: makeCluster('Visual Aesthetics') },
-		{ id: '10', type: 'article', title: 'The Shape of Design', content: 'Frank Chimero explores how design is not just problem-solving but a way of contributing to the world.', url: 'shapeofdesignbook.com', thumbnailUrl: null, note: null, cluster: makeCluster('Design Philosophy') },
-		{ id: '3', type: 'image', title: 'Tokyo Alleyway at Night', content: null, url: 'https://images.unsplash.com/photo-1542051841857-5f90071e7989?w=600', thumbnailUrl: null, note: null, cluster: makeCluster('Visual Aesthetics') },
-		{ id: '11', type: 'article', title: 'Attention Is All You Need', content: 'The landmark paper introducing the Transformer architecture that revolutionized NLP.', url: 'arxiv.org', thumbnailUrl: null, note: null, cluster: makeCluster('Technology') },
-		{ id: '8', type: 'quote', title: 'On Craft', content: 'The details are not the details. They make the design.', url: null, thumbnailUrl: null, note: 'Charles Eames', cluster: makeCluster('Design Philosophy') },
-		{ id: '4', type: 'image', title: 'Minimalist Interior', content: null, url: 'https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=400', thumbnailUrl: null, note: null, cluster: makeCluster('Visual Aesthetics') },
-		{ id: '13', type: 'article', title: 'Local-First Software', content: 'A new paradigm that keeps data on the user\'s device while enabling collaboration.', url: 'inkandswitch.com', thumbnailUrl: null, note: null, cluster: makeCluster('Technology') },
-		{ id: '9', type: 'quote', title: 'On Seeing', content: 'The real voyage of discovery consists not in seeking new landscapes, but in having new eyes.', url: null, thumbnailUrl: null, note: 'Marcel Proust', cluster: makeCluster('Literature') },
-		{ id: '5', type: 'image', title: 'Abstract Color Field', content: null, url: 'https://images.unsplash.com/photo-1541701494587-cb58502866ab?w=400', thumbnailUrl: null, note: null, cluster: makeCluster('Visual Aesthetics') },
-		{ id: '14', type: 'screenshot', title: 'Linear App — Issue Board', content: null, url: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=400', thumbnailUrl: null, note: null, cluster: makeCluster('Technology') },
-		{ id: '18', type: 'quote', title: 'On Technology', content: 'Any sufficiently advanced technology is indistinguishable from magic.', url: null, thumbnailUrl: null, note: 'Arthur C. Clarke', cluster: makeCluster('Technology') },
-		{ id: '12', type: 'article', title: 'A Handmade Web', content: 'J.R. Carpenter argues for websites crafted with care, intention, and human touch.', url: 'luckysoap.com', thumbnailUrl: null, note: null, cluster: makeCluster('Design Philosophy') },
-		{ id: '6', type: 'image', title: 'Weathered Typography', content: null, url: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=200', thumbnailUrl: null, note: null, cluster: makeCluster('Visual Aesthetics') },
-		{ id: '15', type: 'quote', title: 'On Knowledge', content: 'The only true wisdom is in knowing you know nothing.', url: null, thumbnailUrl: null, note: 'Socrates', cluster: makeCluster('Literature') },
-		{ id: '16', type: 'screenshot', title: 'VS Code — Monokai', content: null, url: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=300', thumbnailUrl: null, note: null, cluster: makeCluster('Technology') },
-		{ id: '20', type: 'image', title: 'Light Study', content: null, url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200', thumbnailUrl: null, note: null, cluster: makeCluster('Visual Aesthetics') },
-		{ id: '19', type: 'article', title: 'How Buildings Learn', content: 'Stewart Brand on how buildings adapt and change over time, and what that teaches us about design.', url: 'goodreads.com', thumbnailUrl: null, note: null, cluster: makeCluster('Design Philosophy') },
-		{ id: '21', type: 'article', title: 'The Garden and the Stream', content: 'Mike Caulfield on the difference between the garden (timeless, connected) and the stream (ephemeral, linear).', url: 'hapgood.us', thumbnailUrl: null, note: null, cluster: makeCluster('Literature') },
-		{ id: '17', type: 'image', title: null, content: null, url: 'https://images.unsplash.com/photo-1558655146-9f40138edfeb?w=200', thumbnailUrl: null, note: null, cluster: makeCluster('Technology') },
-	];
-
-	// Use server data if available, otherwise demo data
-	let gridItems: GridItem[] = $derived(
-		(data?.items && data.items.length > 0) ? data.items : demoItems
-	);
+	// Use server data
+	let gridItems: GridItem[] = $derived(data?.items ?? []);
 
 	// Extract unique clusters for filter pills
 	const allClusters = $derived.by(() => {
@@ -101,6 +80,48 @@
 			return url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
 		} catch {
 			return url;
+		}
+	}
+
+	// ── Organize ──────────────────────────────────
+	let organizing = $state(false);
+
+	async function handleOrganize() {
+		organizing = true;
+		try {
+			// Reprocess any items missing CLIP embeddings
+			const res = await fetch('/api/items');
+			if (!res.ok) throw new Error('Failed to fetch items');
+			const allItems = await res.json();
+			const pending = allItems.filter((i: any) => i.embeddingStatus !== 'complete');
+
+			if (pending.length > 0) {
+				for (const item of pending) {
+					await fetch(`/api/items/${item.id}`, { method: 'PATCH' });
+				}
+				// Poll until all embeddings are complete (max 60s)
+				for (let i = 0; i < 30; i++) {
+					await new Promise((r) => setTimeout(r, 2000));
+					const check = await fetch('/api/items');
+					if (!check.ok) continue;
+					const current = await check.json();
+					const stillPending = current.filter((i: any) => i.embeddingStatus !== 'complete' && i.embeddingStatus !== 'failed');
+					if (stillPending.length === 0) break;
+				}
+			}
+
+			// Trigger reclustering
+			const clusterRes = await fetch('/api/clusters', { method: 'POST' });
+			if (clusterRes.ok) {
+				appStore.showToast('Collection organized', 'success');
+				window.location.reload();
+			} else {
+				appStore.showToast('Organize failed', 'error');
+			}
+		} catch {
+			appStore.showToast('Organize failed', 'error');
+		} finally {
+			organizing = false;
 		}
 	}
 
@@ -160,6 +181,7 @@
 				formData.append('type', 'image');
 				await saveFromInput(formData);
 				appStore.showToast('Image saved to library', 'success');
+				await invalidateAll();
 			} catch {
 				appStore.showToast('Failed to save image', 'error');
 			}
@@ -180,9 +202,132 @@
 				await saveFromInput({ content: text, type: 'quote' });
 				appStore.showToast('Text saved to library', 'success');
 			}
+			await invalidateAll();
 		} catch {
 			appStore.showToast('Failed to save', 'error');
 		}
+	}
+
+	// ── Overdrive: Scroll-driven reveal with stagger ──
+	function reveal(node: HTMLElement, index: number) {
+		if (prefersReducedMotion) {
+			node.classList.add('revealed', 'tilt-ready');
+			return { destroy() {} };
+		}
+
+		node.style.setProperty('--reveal-i', String(Math.min(index, 15)));
+
+		const observer = new IntersectionObserver(
+			(entries) => {
+				for (const entry of entries) {
+					if (entry.isIntersecting) {
+						const el = entry.target as HTMLElement;
+						requestAnimationFrame(() => el.classList.add('revealed'));
+						const staggerMs = Math.min(index, 15) * 50 + 550;
+						setTimeout(() => el.classList.add('tilt-ready'), staggerMs);
+						observer.unobserve(entry.target);
+					}
+				}
+			},
+			{ threshold: 0.08, rootMargin: '0px 0px -40px 0px' }
+		);
+
+		observer.observe(node);
+		return { destroy() { observer.disconnect(); } };
+	}
+
+	// ── Overdrive: 3D tilt on hover ───────────────────
+	function tilt(node: HTMLElement) {
+		if (prefersReducedMotion || !canHover) return { destroy() {} };
+
+		let rafId: number;
+		let active = false;
+		let tx = 0, ty = 0, cx = 0, cy = 0;
+
+		function animate() {
+			cx += ((active ? tx : 0) - cx) * 0.1;
+			cy += ((active ? ty : 0) - cy) * 0.1;
+
+			if (Math.abs(cx) > 0.01 || Math.abs(cy) > 0.01) {
+				node.style.transform = `perspective(600px) rotateX(${cx}deg) rotateY(${cy}deg)`;
+				rafId = requestAnimationFrame(animate);
+			} else if (!active) {
+				node.style.transform = '';
+			} else {
+				rafId = requestAnimationFrame(animate);
+			}
+		}
+
+		function onMove(e: MouseEvent) {
+			if (!node.classList.contains('tilt-ready')) return;
+			const r = node.getBoundingClientRect();
+			const nx = (e.clientX - r.left) / r.width;
+			const ny = (e.clientY - r.top) / r.height;
+			ty = (nx - 0.5) * 6;
+			tx = (0.5 - ny) * 6;
+			if (!active) { active = true; rafId = requestAnimationFrame(animate); }
+		}
+
+		function onLeave() { active = false; }
+
+		node.addEventListener('mousemove', onMove);
+		node.addEventListener('mouseleave', onLeave);
+		return {
+			destroy() {
+				cancelAnimationFrame(rafId);
+				node.removeEventListener('mousemove', onMove);
+				node.removeEventListener('mouseleave', onLeave);
+			}
+		};
+	}
+
+	// ── Overdrive: Spring physics FAB ─────────────────
+	function springEl(node: HTMLElement) {
+		if (prefersReducedMotion) return { destroy() {} };
+
+		let s = 1, v = 0, target = 1;
+		let rafId: number;
+		let running = false;
+
+		function step() {
+			const f = -300 * (s - target) - 20 * v;
+			v += f / 60;
+			s += v / 60;
+			node.style.transform = `scale(${s})`;
+
+			if (Math.abs(s - target) > 0.001 || Math.abs(v) > 0.01) {
+				rafId = requestAnimationFrame(step);
+			} else {
+				s = target;
+				node.style.transform = target === 1 ? '' : `scale(${target})`;
+				running = false;
+			}
+		}
+
+		function go(t: number) {
+			target = t;
+			if (!running) { running = true; rafId = requestAnimationFrame(step); }
+		}
+
+		const onEnter = () => go(1.12);
+		const onLeave = () => go(1);
+		const onDown = () => { v = -3; go(0.88); };
+		const onUp = () => go(1.12);
+
+		node.addEventListener('mouseenter', onEnter);
+		node.addEventListener('mouseleave', onLeave);
+		node.addEventListener('mousedown', onDown);
+		node.addEventListener('mouseup', onUp);
+
+		return {
+			destroy() {
+				cancelAnimationFrame(rafId);
+				node.removeEventListener('mouseenter', onEnter);
+				node.removeEventListener('mouseleave', onLeave);
+				node.removeEventListener('mousedown', onDown);
+				node.removeEventListener('mouseup', onUp);
+			}
+		};
 	}
 </script>
 
@@ -210,6 +355,24 @@
 			{cluster.name}
 		</button>
 	{/each}
+	{#if gridItems.length > 0}
+		<button
+			class="filter-pill organize-btn"
+			onclick={handleOrganize}
+			disabled={organizing}
+			title="Organize your collection into clusters"
+		>
+			{#if organizing}
+				<span class="organize-spinner"></span>
+			{:else}
+				<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<circle cx="12" cy="12" r="3" />
+					<path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+				</svg>
+			{/if}
+			{organizing ? 'Organizing...' : 'Organize'}
+		</button>
+	{/if}
 </div>
 
 <!-- Grid Library -->
@@ -222,8 +385,9 @@
 	ondragleave={handleDragLeave}
 	ondrop={handleDrop}
 >
+	{#if visibleItems.length === 0}<EmptyState heading="Your collection is empty" subtitle="Save your first item to get started" />{:else}
 	<div class="grid">
-		{#each visibleItems as item (item.id)}
+		{#each visibleItems as item, i (item.id)}
 			{@const isTransitioning = transitioningId === item.id}
 			{@const clusterCol = item.cluster?.color || 'rgba(255,255,255,0.06)'}
 			<button
@@ -233,6 +397,8 @@
 				class:card-type-article={item.type === 'article'}
 				style="--cluster-col: {clusterCol}"
 				onclick={() => handleItemClick(item.id)}
+				use:reveal={i}
+				use:tilt
 			>
 				{#if item.type === 'image' || item.type === 'screenshot'}
 					<div class="card-image" style={isTransitioning ? 'view-transition-name: item-hero' : ''}>
@@ -268,10 +434,17 @@
 			</button>
 		{/each}
 	</div>
+	{/if}
 </div>
 
 {#if isDragging}
-	<div class="drop-overlay">
+	<div
+		class="drop-overlay"
+		ondragover={handleDragOver}
+		ondragenter={handleDragEnter}
+		ondragleave={handleDragLeave}
+		ondrop={handleDrop}
+	>
 		<div class="drop-message">
 			<div class="drop-icon">+</div>
 			Drop to save
@@ -280,7 +453,7 @@
 {/if}
 
 <!-- Floating add button -->
-<button class="fab" aria-label="Add new item" onclick={() => appStore.openQuickAdd()}>
+<button class="fab" aria-label="Add new item" onclick={() => appStore.openQuickAdd()} use:springEl>
 	<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 		<path d="M12 5v14" />
 		<path d="M5 12h14" />
@@ -334,6 +507,36 @@
 		background: rgba(255, 255, 255, 0.08);
 	}
 
+	.organize-btn {
+		margin-left: var(--space-2xs);
+		border-left: 1px solid var(--border-subtle);
+		padding-left: 14px;
+		gap: 5px;
+		color: var(--text-ghost);
+	}
+
+	.organize-btn:hover {
+		color: var(--accent-sage);
+	}
+
+	.organize-btn:disabled {
+		opacity: 0.5;
+		cursor: wait;
+	}
+
+	.organize-spinner {
+		width: 10px;
+		height: 10px;
+		border: 1.5px solid var(--text-ghost);
+		border-top-color: var(--accent-sage);
+		border-radius: var(--radius-full);
+		animation: spin 600ms linear infinite;
+	}
+
+	@keyframes spin {
+		to { transform: rotate(360deg); }
+	}
+
 	.filter-dot {
 		width: 6px;
 		height: 6px;
@@ -343,8 +546,9 @@
 
 	/* ── Library ─────────────────────────────────── */
 	.library {
+		margin-top: var(--space-2xl);
 		min-height: 100vh;
-		padding: calc(var(--navbar-height) + var(--space-3xl)) var(--space-lg) var(--space-3xl);
+		padding: var(--space-3xl)+220px var(--space-3xl)+220px;
 		background: var(--bg-void);
 	}
 
@@ -370,6 +574,25 @@
 		text-align: left;
 		font-family: inherit;
 		outline: none;
+		/* Overdrive: start hidden for scroll reveal */
+		opacity: 0;
+		transform: translateY(20px) scale(0.98);
+		transition:
+			opacity 500ms var(--ease-out) calc(var(--reveal-i, 0) * 50ms),
+			transform 500ms cubic-bezier(0, 0, 0.2, 1) calc(var(--reveal-i, 0) * 50ms);
+	}
+
+	/* Overdrive: revealed by IntersectionObserver
+	   :global() prevents Svelte from stripping these —
+	   the classes are added via JS classList, not template bindings */
+	.grid-card:global(.revealed) {
+		opacity: 1;
+		transform: none;
+	}
+
+	/* Overdrive: after reveal, kill CSS transition so JS tilt runs at 60fps */
+	.grid-card:global(.tilt-ready) {
+		transition: none;
 	}
 
 	/* Keyboard focus — subtle ring in sage */
@@ -542,7 +765,7 @@
 		color: var(--text-tertiary);
 	}
 
-	/* ── FAB ─────────────────────────────────────── */
+	/* ── FAB (spring physics via JS, shadow via CSS) ── */
 	.fab {
 		position: fixed;
 		bottom: var(--space-xl);
@@ -559,17 +782,11 @@
 		justify-content: center;
 		cursor: pointer;
 		box-shadow: 0 4px 20px -2px rgba(123, 158, 135, 0.35);
-		transition: transform var(--duration-fast) var(--ease-out),
-			box-shadow var(--duration-fast) var(--ease-out);
+		transition: box-shadow var(--duration-fast) var(--ease-out);
 	}
 
 	.fab:hover {
-		transform: scale(1.08);
 		box-shadow: 0 6px 28px -2px rgba(123, 158, 135, 0.5);
-	}
-
-	.fab:active {
-		transform: scale(0.96);
 	}
 
 	/* ── Drop Overlay ───────────────────────────── */
@@ -651,6 +868,15 @@
 
 		.cluster-filters::-webkit-scrollbar {
 			display: none;
+		}
+	}
+
+	/* ── Reduced motion: skip all overdrive effects ── */
+	@media (prefers-reduced-motion: reduce) {
+		.grid-card {
+			opacity: 1 !important;
+			transform: none !important;
+			transition: none !important;
 		}
 	}
 </style>

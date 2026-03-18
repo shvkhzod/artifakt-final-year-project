@@ -16,6 +16,8 @@
 		screenshot: 'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zm2 0v14h14V5H5zm2 2h3v3H7V7zm7 0h3v3h-3V7z',
 	};
 
+	let searchContext = $derived(appStore.getSearchContext());
+
 	// Focus input when overlay opens
 	$effect(() => {
 		if (appStore.getSearchOpen() && inputEl) {
@@ -25,6 +27,29 @@
 	});
 
 	let activeResultIndex: number = $state(-1);
+
+	// Flatten results for keyboard navigation regardless of grouped/flat shape
+	interface ResultGroup {
+		cluster: { id: string; name: string; color: string } | null;
+		items: any[];
+	}
+
+	let rawResults = $derived(appStore.getSearchResults());
+
+	let isGrouped = $derived(
+		Array.isArray(rawResults) &&
+		rawResults.length > 0 &&
+		'cluster' in rawResults[0] &&
+		'items' in rawResults[0]
+	);
+
+	let groups = $derived(isGrouped ? (rawResults as unknown as ResultGroup[]) : []);
+
+	let flatResults = $derived(
+		isGrouped
+			? (rawResults as unknown as ResultGroup[]).flatMap((g) => g.items)
+			: (rawResults as any[])
+	);
 
 	// Reset active index when results change
 	$effect(() => {
@@ -42,19 +67,18 @@
 		handleFocusTrap(event);
 
 		// Arrow key navigation through results
-		const results = appStore.getSearchResults();
-		if (results.length === 0) return;
+		if (flatResults.length === 0) return;
 
 		if (event.key === 'ArrowDown') {
 			event.preventDefault();
-			activeResultIndex = Math.min(activeResultIndex + 1, results.length - 1);
+			activeResultIndex = Math.min(activeResultIndex + 1, flatResults.length - 1);
 		} else if (event.key === 'ArrowUp') {
 			event.preventDefault();
 			activeResultIndex = Math.max(activeResultIndex - 1, -1);
 			if (activeResultIndex === -1) inputEl?.focus();
 		} else if (event.key === 'Enter' && activeResultIndex >= 0) {
 			event.preventDefault();
-			handleResultClick(results[activeResultIndex].id);
+			handleResultClick(flatResults[activeResultIndex].id);
 		}
 	}
 
@@ -72,6 +96,10 @@
 		appStore.closeSearch();
 	}
 
+	function clearContext() {
+		appStore.setSearchContext({ page: searchContext.page });
+	}
+
 	function extractDomain(url: string | null): string {
 		if (!url) return '';
 		try {
@@ -84,6 +112,30 @@
 	function truncate(text: string | null, maxLen: number): string {
 		if (!text) return '';
 		return text.length > maxLen ? text.slice(0, maxLen) + '...' : text;
+	}
+
+	function relativeDate(date: Date | string): string {
+		const d = new Date(date);
+		const now = new Date();
+		const days = Math.floor((now.getTime() - d.getTime()) / 86400000);
+		if (days === 0) return 'today';
+		if (days === 1) return 'yesterday';
+		if (days < 7) return `${days}d ago`;
+		if (days < 30) return `${Math.floor(days / 7)}w ago`;
+		if (days < 365) return `${Math.floor(days / 30)}mo ago`;
+		return `${Math.floor(days / 365)}y ago`;
+	}
+
+	/**
+	 * For grouped rendering, compute the flat index of an item
+	 * given its group index and position within that group.
+	 */
+	function flatIndex(groupIdx: number, itemIdx: number): number {
+		let offset = 0;
+		for (let i = 0; i < groupIdx; i++) {
+			offset += groups[i].items.length;
+		}
+		return offset + itemIdx;
 	}
 </script>
 
@@ -117,41 +169,117 @@
 				</button>
 			</div>
 
+			<!-- Context pill -->
+			{#if searchContext.clusterId || searchContext.after}
+				<div class="context-pill-wrap">
+					<div class="context-pill">
+						{#if searchContext.clusterId}
+							<span class="context-dot" style="background: {searchContext.clusterColor}"></span>
+							<span>{searchContext.clusterName}</span>
+						{:else if searchContext.after}
+							<span>Filtered by date</span>
+						{/if}
+						<button class="context-clear" onclick={clearContext}>&#215;</button>
+					</div>
+				</div>
+			{/if}
+
 			<!-- Results -->
 			<div class="search-results">
 				{#if appStore.getIsSearching()}
 					<div class="search-status">
 						<span class="search-status-text">Searching...</span>
 					</div>
-				{:else if appStore.getSearchQuery().trim() && appStore.getSearchResults().length === 0}
+				{:else if appStore.getSearchQuery().trim() && flatResults.length === 0}
 					<div class="search-status">
 						<span class="search-status-text">No results found</span>
 					</div>
-				{:else if appStore.getSearchResults().length > 0}
+				{:else if flatResults.length > 0}
 					<ul class="results-list" role="listbox" aria-label="Search results">
-						{#each appStore.getSearchResults() as result, idx (result.id)}
-							<li class="result-item" role="option" aria-selected={idx === activeResultIndex}>
-								<button class="result-btn" class:result-active={idx === activeResultIndex} onclick={() => handleResultClick(result.id)}>
-									<div class="result-type-icon">
-										<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-											<path d={typeIcons[result.type] || typeIcons.article} />
+						{#if isGrouped}
+							{#each groups as group, gIdx}
+								<li class="result-group" role="group">
+									<div class="result-group-header">
+										{#if group.cluster}
+											<span class="context-dot" style="background: {group.cluster.color}"></span>
+											<span>{group.cluster.name}</span>
+											<span class="group-count">({group.items.length})</span>
+										{:else}
+											<span>Other</span>
+											<span class="group-count">({group.items.length})</span>
+										{/if}
+									</div>
+									<ul class="result-group-items">
+										{#each group.items as result, iIdx (result.id)}
+											{@const fIdx = flatIndex(gIdx, iIdx)}
+											<li class="result-item" role="option" aria-selected={fIdx === activeResultIndex}>
+												<button class="result-btn" class:result-active={fIdx === activeResultIndex} onclick={() => handleResultClick(result.id)}>
+													{#if (result.type === 'image' || result.type === 'screenshot') && (result.thumbnailUrl || result.thumbnail_url || result.url)}
+														<div class="result-thumb">
+															<img src={result.thumbnailUrl || result.thumbnail_url || result.url} alt="" loading="lazy" />
+														</div>
+													{:else}
+														<div class="result-type-icon">
+															<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+																<path d={typeIcons[result.type] || typeIcons.article} />
+															</svg>
+														</div>
+													{/if}
+													<div class="result-info">
+														<span class="result-title">{result.title || 'Untitled'}</span>
+														{#if result.content}
+															<span class="result-snippet">{truncate(result.content, 80)}</span>
+														{/if}
+														{#if result.url && result.type !== 'image' && result.type !== 'screenshot'}
+															<span class="result-source">{extractDomain(result.url)}</span>
+														{/if}
+													</div>
+													{#if result.createdAt || result.created_at}
+														<span class="result-date">{relativeDate(result.createdAt || result.created_at)}</span>
+													{/if}
+													<svg class="result-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+														<path d="m9 18 6-6-6-6" />
+													</svg>
+												</button>
+											</li>
+										{/each}
+									</ul>
+								</li>
+							{/each}
+						{:else}
+							{#each flatResults as result, idx (result.id)}
+								<li class="result-item" role="option" aria-selected={idx === activeResultIndex}>
+									<button class="result-btn" class:result-active={idx === activeResultIndex} onclick={() => handleResultClick(result.id)}>
+										{#if (result.type === 'image' || result.type === 'screenshot') && (result.thumbnailUrl || result.thumbnail_url || result.url)}
+											<div class="result-thumb">
+												<img src={result.thumbnailUrl || result.thumbnail_url || result.url} alt="" loading="lazy" />
+											</div>
+										{:else}
+											<div class="result-type-icon">
+												<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+													<path d={typeIcons[result.type] || typeIcons.article} />
+												</svg>
+											</div>
+										{/if}
+										<div class="result-info">
+											<span class="result-title">{result.title || 'Untitled'}</span>
+											{#if result.content}
+												<span class="result-snippet">{truncate(result.content, 80)}</span>
+											{/if}
+											{#if result.url && result.type !== 'image' && result.type !== 'screenshot'}
+												<span class="result-source">{extractDomain(result.url)}</span>
+											{/if}
+										</div>
+										{#if result.createdAt || result.created_at}
+											<span class="result-date">{relativeDate(result.createdAt || result.created_at)}</span>
+										{/if}
+										<svg class="result-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+											<path d="m9 18 6-6-6-6" />
 										</svg>
-									</div>
-									<div class="result-info">
-										<span class="result-title">{result.title || 'Untitled'}</span>
-										{#if result.content}
-											<span class="result-snippet">{truncate(result.content, 80)}</span>
-										{/if}
-										{#if result.url}
-											<span class="result-source">{extractDomain(result.url)}</span>
-										{/if}
-									</div>
-									<svg class="result-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-										<path d="m9 18 6-6-6-6" />
-									</svg>
-								</button>
-							</li>
-						{/each}
+									</button>
+								</li>
+							{/each}
+						{/if}
 					</ul>
 				{:else}
 					<div class="search-empty">
@@ -245,6 +373,50 @@
 		padding: 2px 6px;
 	}
 
+	/* ── Context Pill ─────────────────────────── */
+	.context-pill-wrap {
+		padding: var(--space-sm) var(--space-lg) 0;
+	}
+
+	.context-pill {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 3px 8px 3px 6px;
+		margin: 0 0 var(--space-xs);
+		font-size: 11px;
+		color: var(--text-tertiary);
+		background: rgba(255, 255, 255, 0.04);
+		border-radius: var(--radius-full);
+		border: 1px solid var(--border-subtle);
+	}
+
+	.context-dot {
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		flex-shrink: 0;
+	}
+
+	.context-clear {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 14px;
+		height: 14px;
+		border: none;
+		background: none;
+		color: var(--text-ghost);
+		font-size: 12px;
+		cursor: pointer;
+		padding: 0;
+		border-radius: 50%;
+	}
+
+	.context-clear:hover {
+		color: var(--text-tertiary);
+	}
+
 	/* ── Results ──────────────────────────────── */
 	.search-results {
 		max-height: 400px;
@@ -284,6 +456,33 @@
 		padding: var(--space-xs) 0;
 	}
 
+	.result-group {
+		list-style: none;
+	}
+
+	.result-group-items {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	.result-group-header {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		padding: 8px 12px 4px;
+		font-size: 10px;
+		font-weight: 500;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--text-ghost);
+	}
+
+	.group-count {
+		color: var(--text-ghost);
+		font-weight: 400;
+	}
+
 	.result-item {
 		margin: 0;
 	}
@@ -318,6 +517,21 @@
 		color: var(--text-tertiary);
 	}
 
+	.result-thumb {
+		flex-shrink: 0;
+		width: 40px;
+		height: 40px;
+		border-radius: var(--radius-sm);
+		overflow: hidden;
+		background: rgba(255, 255, 255, 0.04);
+	}
+
+	.result-thumb img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
 	.result-info {
 		flex: 1;
 		min-width: 0;
@@ -349,6 +563,14 @@
 		font-family: var(--font-body);
 		font-size: var(--text-2xs);
 		color: var(--text-tertiary);
+	}
+
+	.result-date {
+		font-size: 10px;
+		color: var(--text-ghost);
+		flex-shrink: 0;
+		margin-left: auto;
+		padding-left: var(--space-xs);
 	}
 
 	.result-arrow {

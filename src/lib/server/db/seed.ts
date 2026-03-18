@@ -25,22 +25,22 @@ async function seed() {
 	// Create clusters
 	const [visualAesthetics] = await db
 		.insert(clusters)
-		.values({ name: 'Visual Aesthetics', color: CLUSTER_COLORS.amber, description: 'Photography, art, and visual beauty' })
+		.values({ name: 'Visual Aesthetics', color: CLUSTER_COLORS.amber, description: 'Photography, art, and visual beauty', source: 'user' })
 		.returning();
 
 	const [designPhilosophy] = await db
 		.insert(clusters)
-		.values({ name: 'Design Philosophy', color: CLUSTER_COLORS.cyan, description: 'Principles of good design and craft' })
+		.values({ name: 'Design Philosophy', color: CLUSTER_COLORS.cyan, description: 'Principles of good design and craft', source: 'user' })
 		.returning();
 
 	const [technology] = await db
 		.insert(clusters)
-		.values({ name: 'Technology', color: CLUSTER_COLORS.emerald, description: 'Software, AI, and digital tools' })
+		.values({ name: 'Technology', color: CLUSTER_COLORS.emerald, description: 'Software, AI, and digital tools', source: 'user' })
 		.returning();
 
 	const [literature] = await db
 		.insert(clusters)
-		.values({ name: 'Literature', color: CLUSTER_COLORS.mauve, description: 'Writing, philosophy, and ideas' })
+		.values({ name: 'Literature', color: CLUSTER_COLORS.mauve, description: 'Writing, philosophy, and ideas', source: 'user' })
 		.returning();
 
 	// Create tags

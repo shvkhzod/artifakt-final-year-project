@@ -1,6 +1,6 @@
 import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createItem, getItems } from '$lib/server/db/queries';
+import { createItem, getItems, stripEmbeddings } from '$lib/server/db/queries';
 import type { NewItem } from '$lib/server/db/schema';
 import { z } from 'zod';
 
@@ -12,7 +12,7 @@ export const GET: RequestHandler = async ({ url }) => {
 
 	try {
 		const items = await getItems({ limit, offset, type, clusterId });
-		return json(items);
+		return json(items.map(stripEmbeddings));
 	} catch (e) {
 		console.error('Failed to fetch items:', e);
 		throw error(500, 'Failed to fetch items');

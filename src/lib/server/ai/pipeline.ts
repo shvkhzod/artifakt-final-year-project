@@ -1,111 +1,91 @@
-/**
- * Full AI pipeline: called after an item is saved.
- * 1. Generate embedding for the item
- * 2. Find nearest existing cluster or suggest one
- * 3. Assign item to cluster
- *
- * Each step is wrapped in its own try/catch so a failure in clustering
- * does not prevent the embedding from being stored.
- */
+import { getEmbeddingProvider, getEmbeddingType } from './embeddings/provider';
+import { generateCaption } from './captioning';
+import { assignItemToCluster } from './clustering/assign';
+import { shouldRecluster, runRecluster } from './clustering/recluster';
+import { updateItemEmbedding, updateClipEmbedding, updateContentEmbedding, updateSearchText, setEmbeddingStatus } from '$lib/server/db/queries';
+
 export async function processItemPipeline(
-	itemId: string,
-	item: {
-		type: string;
-		title?: string | null;
-		content?: string | null;
-		url?: string | null;
-		thumbnailUrl?: string | null;
-	},
+  itemId: string,
+  item: {
+    type: string;
+    title?: string | null;
+    content?: string | null;
+    url?: string | null;
+    thumbnailUrl?: string | null;
+  },
 ): Promise<void> {
-	const { generateEmbeddingForItem } = await import('./embeddings');
-	const {
-		updateItemEmbedding,
-		getClusters,
-		addItemToCluster,
-		searchSimilarItems,
-	} = await import('$lib/server/db/queries');
-	const { suggestClusters } = await import('./clustering');
+  const embeddingType = getEmbeddingType(item.type);
+  const provider = await getEmbeddingProvider();
 
-	// Step 1: Generate and store embedding
-	let embeddingVector: number[];
-	try {
-		const embeddingResult = await generateEmbeddingForItem(item);
-		await updateItemEmbedding(itemId, embeddingResult.vector);
-		embeddingVector = embeddingResult.vector;
-		console.log(
-			`[pipeline] Embedding stored for item ${itemId} (${embeddingResult.model}, ${embeddingResult.dimensions}d)`,
-		);
-	} catch (e) {
-		console.error(`[pipeline] Embedding generation failed for item ${itemId}:`, e);
-		return; // Cannot proceed without an embedding
-	}
+  let clipEmbedding: number[];
 
-	// Step 2: Try to assign to an existing cluster
-	try {
-		const clusters = await getClusters();
-		if (clusters.length === 0) {
-			console.log(`[pipeline] No clusters exist yet — skipping cluster assignment for item ${itemId}`);
-			return;
-		}
+  try {
+    if (embeddingType === 'image') {
+      const imageUrl = item.url || item.thumbnailUrl;
+      if (!imageUrl) {
+        console.warn(`Item ${itemId}: no image URL, skipping`);
+        await setEmbeddingStatus(itemId, 'failed');
+        return;
+      }
 
-		// Find similar items that already have cluster assignments
-		const similarItems = await searchSimilarItems(embeddingVector, 20);
+      // 1. Visual embedding (Jina CLIP v2 image mode)
+      clipEmbedding = await provider.embedClip(imageUrl, 'image');
+      await updateClipEmbedding(itemId, clipEmbedding);
+      console.log(`Visual embedding for ${itemId} (${clipEmbedding.length}d)`);
 
-		if (similarItems.length === 0) {
-			console.log(`[pipeline] No similar items found — skipping cluster assignment for item ${itemId}`);
-			return;
-		}
+      // 2. AI caption + content embedding (using text model for semantic search)
+      const caption = await generateCaption(imageUrl);
+      if (caption) {
+        const contentEmbedding = await provider.embedText(caption);
+        await updateContentEmbedding(itemId, contentEmbedding, caption);
+        console.log(`Content embedding for ${itemId} from caption (${contentEmbedding.length}d)`);
+      }
+    } else {
+      // Text items: embed content via Jina CLIP text mode
+      const parts: string[] = [];
+      if (item.title) parts.push(item.title);
+      if (item.content) parts.push(item.content);
+      const text = parts.join('. ').trim();
 
-		// Build the items-with-clusters list for suggestClusters.
-		// We need to query which clusters each similar item belongs to.
-		const { db } = await import('$lib/server/db');
-		const { itemClusters } = await import('$lib/server/db/schema');
-		const { eq } = await import('drizzle-orm');
+      if (text.length < 10) {
+        console.warn(`Item ${itemId}: content too short ("${text}"), skipping`);
+        await setEmbeddingStatus(itemId, 'failed');
+        return;
+      }
 
-		// Get cluster assignments for similar items
-		const similarItemIds = similarItems.map((si) => si.id);
-		const assignments = await db.select().from(itemClusters);
+      clipEmbedding = await provider.embedClip(text, 'text');
+      await updateClipEmbedding(itemId, clipEmbedding);
 
-		const assignmentMap = new Map<string, string>();
-		for (const a of assignments) {
-			assignmentMap.set(a.itemId, a.clusterId);
-		}
+      // Content embedding uses dedicated text model for better semantic search
+      const contentEmbedding = await provider.embedText(text);
+      await updateContentEmbedding(itemId, contentEmbedding, text);
+      console.log(`Text embedding for ${itemId} (clip: ${clipEmbedding.length}d, content: ${contentEmbedding.length}d)`);
+    }
 
-		const itemsWithClusters = similarItems
-			.filter((si) => si.id !== itemId)
-			.map((si) => ({
-				embedding: si.embedding,
-				clusterId: assignmentMap.get(si.id),
-			}));
+    await updateSearchText(itemId);
+    await setEmbeddingStatus(itemId, 'complete');
+  } catch (e) {
+    console.error(`Embedding failed for item ${itemId}:`, e);
+    await setEmbeddingStatus(itemId, 'failed');
+    return;
+  }
 
-		const suggestedClusterIds = suggestClusters(embeddingVector, itemsWithClusters);
+  // Cluster assignment uses clip_embedding (visual similarity for clustering)
+  try {
+    const result = await assignItemToCluster(itemId, clipEmbedding);
+    if (result) {
+      console.log(`Assigned item ${itemId} → ${result.clusterId} (${(result.confidence * 100).toFixed(0)}%)`);
+    }
+  } catch (e) {
+    console.error(`Cluster assignment failed for item ${itemId}:`, e);
+  }
 
-		if (suggestedClusterIds.length > 0) {
-			// Calculate average similarity to items in the suggested cluster
-			const targetClusterId = suggestedClusterIds[0];
-			const clusterItems = similarItems.filter(
-				(si) => assignmentMap.get(si.id) === targetClusterId && si.id !== itemId,
-			);
-
-			let confidence = 0.5; // default confidence
-			if (clusterItems.length > 0) {
-				const avgSimilarity =
-					clusterItems.reduce((sum, ci) => sum + (ci.similarity ?? 0), 0) /
-					clusterItems.length;
-				confidence = Math.max(0.1, Math.min(1.0, avgSimilarity));
-			}
-
-			await addItemToCluster(itemId, targetClusterId, confidence);
-			console.log(
-				`[pipeline] Item ${itemId} assigned to cluster ${targetClusterId} (confidence: ${confidence.toFixed(3)})`,
-			);
-		} else {
-			console.log(`[pipeline] No suitable cluster found for item ${itemId}`);
-		}
-	} catch (e) {
-		console.error(`[pipeline] Cluster assignment failed for item ${itemId}:`, e);
-		// Embedding was already stored — this is a non-fatal error
-	}
-
-	console.log(`[pipeline] Pipeline complete for item ${itemId}`);
+  try {
+    if (await shouldRecluster()) {
+      console.log('Triggering automatic re-clustering...');
+      await runRecluster('auto');
+    }
+  } catch (e) {
+    console.error('Auto re-cluster failed:', e);
+  }
 }

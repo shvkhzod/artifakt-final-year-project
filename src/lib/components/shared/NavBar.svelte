@@ -27,6 +27,11 @@
 		mobileMenuOpen = false;
 	}
 
+	async function handleLogout() {
+		await fetch('/api/auth/logout', { method: 'POST' });
+		window.location.href = '/login';
+	}
+
 	// ── Sliding indicator ────────────────────────
 	let linksContainer: HTMLDivElement | undefined = $state();
 	let indicatorStyle = $state('');
@@ -81,12 +86,13 @@
 				</svg>
 				<span class="kbd-hint">K</span>
 			</button>
-			<div class="avatar-placeholder" aria-hidden="true">
+			<button class="nav-icon-btn" onclick={handleLogout} aria-label="Sign out" title="Sign out">
 				<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-					<circle cx="12" cy="8" r="4" />
-					<path d="M20 21a8 8 0 0 0-16 0" />
+					<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+					<polyline points="16 17 21 12 16 7" />
+					<line x1="21" y1="12" x2="9" y2="12" />
 				</svg>
-			</div>
+			</button>
 
 			<!-- Mobile hamburger -->
 			<button class="hamburger-btn" onclick={toggleMobileMenu} aria-label="Toggle menu" aria-expanded={mobileMenuOpen}>
@@ -138,7 +144,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: var(--space-sm) var(--space-3xl);
+		padding: var(--space-sm) 220px;
 		max-width: 100%;
 	}
 
@@ -235,17 +241,6 @@
 		line-height: var(--leading-snug);
 	}
 
-	.avatar-placeholder {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 32px;
-		height: 32px;
-		border-radius: var(--radius-full);
-		background: rgba(255, 255, 255, 0.06);
-		color: var(--text-tertiary);
-	}
-
 	/* ── Hamburger (mobile only) ───────────────── */
 	.hamburger-btn {
 		display: none;
@@ -298,10 +293,6 @@
 	/* ── Responsive ────────────────────────────── */
 	@media (max-width: 640px) {
 		.navbar-links {
-			display: none;
-		}
-
-		.avatar-placeholder {
 			display: none;
 		}
 

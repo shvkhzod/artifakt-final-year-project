@@ -1,32 +1,92 @@
-import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { searchSimilarItems } from '$lib/server/db/queries';
+import { getEmbeddingProvider } from '$lib/server/ai';
+import { searchHybrid, stripEmbeddings } from '$lib/server/db/queries';
+import { db } from '$lib/server/db';
+import { itemClusters, clusters } from '$lib/server/db/schema';
+import { eq } from 'drizzle-orm';
 
 export const GET: RequestHandler = async ({ url }) => {
-	const query = url.searchParams.get('q');
-	if (!query || query.trim().length === 0) {
-		throw error(400, 'Missing search query parameter "q"');
-	}
+  const query = url.searchParams.get('q');
+  const limit = parseInt(url.searchParams.get('limit') || '20', 10);
+  const clusterId = url.searchParams.get('clusterId');
+  const after = url.searchParams.get('after');
+  const before = url.searchParams.get('before');
+  const groupByCluster = url.searchParams.get('groupByCluster') === 'true';
 
-	const limit = parseInt(url.searchParams.get('limit') || '20');
+  if (!query?.trim()) {
+    return new Response(JSON.stringify({ error: 'Query parameter "q" is required' }), {
+      status: 400,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 
-	try {
-		// Generate an embedding for the search query
-		const { generateTextEmbedding } = await import('$lib/server/ai/embeddings');
-		const embeddingResult = await generateTextEmbedding(query.trim());
+  try {
+    const provider = await getEmbeddingProvider();
 
-		// Find similar items using vector search
-		const results = await searchSimilarItems(embeddingResult.vector, limit);
+    // Hybrid search: semantic (jina-embeddings-v3) + keyword (tsvector)
+    const embedding = await provider.embedText(query);
+    let results = await searchHybrid(embedding, query, limit * 2);
+    results = results.map(stripEmbeddings) as typeof results;
 
-		return json({
-			query: query.trim(),
-			results: results.map((item) => ({
-				...item,
-				similarity: item.similarity,
-			})),
-		});
-	} catch (e) {
-		console.error('Search failed:', e);
-		throw error(500, 'Search failed');
-	}
+    // Filter on combined score (semantic + keyword boost)
+    const SIMILARITY_THRESHOLD = 0.40;
+    results = results.filter((r) => r.similarity >= SIMILARITY_THRESHOLD);
+
+    // Apply date scoping
+    if (after) {
+      const afterDate = new Date(after);
+      results = results.filter((r) => new Date(r.createdAt) >= afterDate);
+    }
+    if (before) {
+      const beforeDate = new Date(before);
+      results = results.filter((r) => new Date(r.createdAt) <= beforeDate);
+    }
+
+    // Apply cluster scoping
+    if (clusterId) {
+      const assignments = await db
+        .select()
+        .from(itemClusters)
+        .where(eq(itemClusters.clusterId, clusterId));
+      const itemIds = new Set(assignments.map((a) => a.itemId));
+      results = results.filter((r) => itemIds.has(r.id));
+    }
+
+    // Trim to limit
+    results = results.slice(0, limit);
+
+    // Group by cluster if requested
+    if (groupByCluster) {
+      const allAssignments = await db.select().from(itemClusters);
+      const allClusters = await db.select().from(clusters);
+      const itemToCluster = new Map(allAssignments.map((a) => [a.itemId, a.clusterId]));
+      const clusterMap = new Map(allClusters.map((c) => [c.id, { id: c.id, name: c.name, color: c.color }]));
+
+      const groupMap = new Map<string | 'none', typeof results>();
+      for (const item of results) {
+        const cId = itemToCluster.get(item.id) ?? 'none';
+        if (!groupMap.has(cId)) groupMap.set(cId, []);
+        groupMap.get(cId)!.push(item);
+      }
+
+      const groups = Array.from(groupMap.entries()).map(([cId, items]) => ({
+        cluster: cId === 'none' ? null : clusterMap.get(cId) ?? null,
+        items,
+      }));
+
+      return new Response(JSON.stringify({ query, groups }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({ query, results }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (e) {
+    console.error('Search failed:', e);
+    return new Response(JSON.stringify({ error: 'Search failed' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 };

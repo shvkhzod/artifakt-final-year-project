@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { invalidateAll } from '$app/navigation';
 	import * as appStore from '$lib/stores/appStore.svelte';
 	import { createFocusTrap } from '$lib/utils/focusTrap';
 
@@ -181,6 +182,7 @@
 
 			appStore.showToast('Saved to your library', 'success');
 			handleClose();
+			await invalidateAll();
 		} catch {
 			appStore.showToast('Failed to save', 'error');
 		} finally {

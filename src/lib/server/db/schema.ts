@@ -11,22 +11,21 @@ import {
 } from 'drizzle-orm/pg-core';
 import type { InferSelectModel, InferInsertModel } from 'drizzle-orm';
 
-// Custom vector type for pgvector
-const vector = customType<{ data: number[]; driverParam: string }>({
-	dataType() {
-		return 'vector(512)';
-	},
-	toDriver(value: number[]): string {
-		return `[${value.join(',')}]`;
-	},
-	fromDriver(value: unknown): number[] {
-		const str = String(value);
-		return str
-			.replace(/[\[\]]/g, '')
-			.split(',')
-			.map(Number);
-	},
-});
+// Custom vector type factory for pgvector
+function pgVector(dimensions: number) {
+	return customType<{ data: number[]; driverParam: string }>({
+		dataType() {
+			return `vector(${dimensions})`;
+		},
+		toDriver(value: number[]): string {
+			return `[${value.join(',')}]`;
+		},
+		fromDriver(value: unknown): number[] {
+			const str = String(value);
+			return str.replace(/[\[\]]/g, '').split(',').map(Number);
+		},
+	});
+}
 
 // Items table
 export const items = pgTable('items', {
@@ -37,7 +36,15 @@ export const items = pgTable('items', {
 	type: text('type', { enum: ['image', 'article', 'quote', 'screenshot'] }).notNull(),
 	thumbnailUrl: text('thumbnail_url'),
 	note: text('note'),
-	embedding: vector('embedding'),
+	textEmbedding: pgVector(1024)('text_embedding'),
+	imageEmbedding: pgVector(1024)('image_embedding'),
+	clipEmbedding: pgVector(1024)('clip_embedding'),
+	contentEmbedding: pgVector(1024)('content_embedding'),
+	aiCaption: text('ai_caption'),
+	embeddingStatus: text('embedding_status', {
+		enum: ['pending', 'complete', 'failed'],
+	}).default('pending').notNull(),
+	searchText: text('search_text'),
 	colorPalette: jsonb('color_palette').$type<{ dominant: string; colors: string[] }>(),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -49,6 +56,7 @@ export const clusters = pgTable('clusters', {
 	name: text('name').notNull(),
 	color: text('color').notNull(),
 	description: text('description'),
+	source: text('source', { enum: ['ai', 'user'] }).default('ai').notNull(),
 	itemCount: integer('item_count').default(0).notNull(),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
@@ -100,6 +108,20 @@ export const insights = pgTable('insights', {
 	clusterId: uuid('cluster_id').references(() => clusters.id),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// Cluster runs table
+export const clusterRuns = pgTable('cluster_runs', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	triggeredBy: text('triggered_by', { enum: ['auto', 'manual'] }).default('auto').notNull(),
+	itemsProcessed: integer('items_processed').notNull(),
+	clustersCreated: integer('clusters_created').default(0).notNull(),
+	clustersModified: integer('clusters_modified').default(0).notNull(),
+	durationMs: integer('duration_ms'),
+	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type ClusterRun = InferSelectModel<typeof clusterRuns>;
+export type NewClusterRun = InferInsertModel<typeof clusterRuns>;
 
 // Inferred types
 export type Item = InferSelectModel<typeof items>;

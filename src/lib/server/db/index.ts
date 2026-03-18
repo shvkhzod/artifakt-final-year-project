@@ -1,9 +1,10 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
+import { env } from '$env/dynamic/private';
 
 const connectionString =
-	process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/Aina';
+	env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/Aina';
 const client = postgres(connectionString, {
 	connect_timeout: 2,
 	idle_timeout: 20,

@@ -3,6 +3,21 @@ import { db } from './index';
 import { items, clusters, itemClusters, tags, itemTags } from './schema';
 import type { Item, NewItem, Cluster, NewCluster, Tag } from './schema';
 
+export function stripEmbeddings<T extends Record<string, any>>(item: T): T {
+	const copy = { ...item };
+	delete copy.textEmbedding;
+	delete copy.imageEmbedding;
+	delete copy.text_embedding;
+	delete copy.image_embedding;
+	delete copy.clipEmbedding;
+	delete copy.clip_embedding;
+	delete copy.contentEmbedding;
+	delete copy.content_embedding;
+	delete copy.search_text;
+	delete copy.searchText;
+	return copy;
+}
+
 // ── Items ──────────────────────────────────────────────
 
 export async function createItem(data: NewItem): Promise<Item> {
@@ -50,26 +65,189 @@ export async function deleteItem(id: string): Promise<void> {
 	await db.delete(items).where(eq(items.id, id));
 }
 
-export async function updateItemEmbedding(id: string, embedding: number[]): Promise<void> {
+export async function updateItemEmbedding(
+	id: string,
+	vector: number[],
+	type: 'text' | 'image',
+): Promise<void> {
+	const column = type === 'text' ? { textEmbedding: vector } : { imageEmbedding: vector };
 	await db
 		.update(items)
-		.set({ embedding, updatedAt: new Date() })
+		.set({ ...column, embeddingStatus: 'complete' as const, updatedAt: new Date() })
 		.where(eq(items.id, id));
+}
+
+export async function updateClipEmbedding(
+	id: string,
+	vector: number[],
+): Promise<void> {
+	await db
+		.update(items)
+		.set({ clipEmbedding: vector, updatedAt: new Date() })
+		.where(eq(items.id, id));
+}
+
+export async function updateContentEmbedding(
+	id: string,
+	vector: number[],
+	caption: string,
+): Promise<void> {
+	await db
+		.update(items)
+		.set({ contentEmbedding: vector, aiCaption: caption, updatedAt: new Date() })
+		.where(eq(items.id, id));
+}
+
+export async function updateSearchText(id: string): Promise<void> {
+	await db.execute(sql`
+		UPDATE items SET search_text = to_tsvector('english',
+			coalesce(title, '') || ' ' || coalesce(content, '') || ' ' || coalesce(ai_caption, '')
+		) WHERE id = ${id}
+	`);
+}
+
+export async function searchHybrid(
+	queryEmbedding: number[],
+	queryText: string,
+	limit: number = 10,
+): Promise<(Item & { similarity: number; semantic_score: number; keyword_score: number })[]> {
+	const vectorStr = `[${queryEmbedding.join(',')}]`;
+	const result = await db.execute(sql`
+		SELECT *,
+			(1 - (content_embedding <=> ${vectorStr}::vector)) as semantic_score,
+			ts_rank(search_text, plainto_tsquery('english', ${queryText})) as keyword_score,
+			(1 - (content_embedding <=> ${vectorStr}::vector))
+				+ (ts_rank(search_text, plainto_tsquery('english', ${queryText})) * 2.0)
+				as similarity
+		FROM items
+		WHERE content_embedding IS NOT NULL
+		ORDER BY similarity DESC
+		LIMIT ${limit}
+	`);
+	return (result.rows ?? result) as (Item & { similarity: number; semantic_score: number; keyword_score: number })[];
 }
 
 export async function searchSimilarItems(
 	embedding: number[],
+	type: 'text' | 'image',
+	limit: number = 10,
+): Promise<(Item & { similarity: number })[]> {
+	const columnName = type === 'text' ? 'text_embedding' : 'image_embedding';
+	const vectorStr = `[${embedding.join(',')}]`;
+
+	const result = await db.execute(sql`
+		SELECT *, 1 - (${sql.raw(columnName)} <=> ${vectorStr}::vector) as similarity
+		FROM items
+		WHERE ${sql.raw(columnName)} IS NOT NULL
+		ORDER BY ${sql.raw(columnName)} <=> ${vectorStr}::vector
+		LIMIT ${limit}
+	`);
+
+	return (result.rows ?? result) as (Item & { similarity: number })[];
+}
+
+export async function findNearestNeighbors(
+	embedding: number[],
+	type: 'text' | 'image',
+	k: number = 5,
+): Promise<Array<{ item_id: string; cluster_id: string | null; confidence: number; similarity: number }>> {
+	const columnName = type === 'text' ? 'text_embedding' : 'image_embedding';
+	const vectorStr = `[${embedding.join(',')}]`;
+
+	const result = await db.execute(sql`
+		SELECT
+			i.id as item_id,
+			ic.cluster_id,
+			COALESCE(ic.confidence, 0) as confidence,
+			1 - (i.${sql.raw(columnName)} <=> ${vectorStr}::vector) as similarity
+		FROM items i
+		LEFT JOIN item_clusters ic ON i.id = ic.item_id
+		WHERE i.${sql.raw(columnName)} IS NOT NULL
+		ORDER BY i.${sql.raw(columnName)} <=> ${vectorStr}::vector
+		LIMIT ${k}
+	`);
+
+	return (result.rows ?? result) as Array<{
+		item_id: string;
+		cluster_id: string | null;
+		confidence: number;
+		similarity: number;
+	}>;
+}
+
+export async function findNearestNeighborsByClip(
+	embedding: number[],
+	k: number = 5,
+): Promise<Array<{ item_id: string; cluster_id: string | null; confidence: number; similarity: number }>> {
+	const vectorStr = `[${embedding.join(',')}]`;
+	const result = await db.execute(sql`
+		SELECT
+			i.id as item_id,
+			ic.cluster_id,
+			COALESCE(ic.confidence, 0) as confidence,
+			1 - (i.clip_embedding <=> ${vectorStr}::vector) as similarity
+		FROM items i
+		LEFT JOIN item_clusters ic ON i.id = ic.item_id
+		WHERE i.clip_embedding IS NOT NULL
+		ORDER BY i.clip_embedding <=> ${vectorStr}::vector
+		LIMIT ${k}
+	`);
+	return (result.rows ?? result) as Array<{
+		item_id: string;
+		cluster_id: string | null;
+		confidence: number;
+		similarity: number;
+	}>;
+}
+
+export async function searchSimilarByClip(
+	embedding: number[],
 	limit: number = 10,
 ): Promise<(Item & { similarity: number })[]> {
 	const vectorStr = `[${embedding.join(',')}]`;
-	const results = await db.execute(sql`
-		SELECT *, 1 - (embedding <=> ${vectorStr}::vector) as similarity
+	const result = await db.execute(sql`
+		SELECT *, 1 - (clip_embedding <=> ${vectorStr}::vector) as similarity
 		FROM items
-		WHERE embedding IS NOT NULL
-		ORDER BY embedding <=> ${vectorStr}::vector
+		WHERE clip_embedding IS NOT NULL
+		ORDER BY clip_embedding <=> ${vectorStr}::vector
 		LIMIT ${limit}
 	`);
-	return results as unknown as (Item & { similarity: number })[];
+	return (result.rows ?? result) as (Item & { similarity: number })[];
+}
+
+export async function getItemsWithoutEmbedding(): Promise<Item[]> {
+	return db
+		.select()
+		.from(items)
+		.where(sql`${items.embeddingStatus} IN ('pending', 'failed')`)
+		.orderBy(items.createdAt);
+}
+
+export async function setEmbeddingStatus(
+	id: string,
+	status: 'pending' | 'complete' | 'failed',
+): Promise<void> {
+	await db
+		.update(items)
+		.set({ embeddingStatus: status, updatedAt: new Date() })
+		.where(eq(items.id, id));
+}
+
+export async function getTemporalNeighbors(
+	itemId: string,
+	createdAt: Date,
+	limit: number = 5,
+): Promise<Item[]> {
+	return db
+		.select()
+		.from(items)
+		.where(sql`
+			id != ${itemId}
+			AND created_at BETWEEN ${createdAt.toISOString()}::timestamptz - INTERVAL '7 days'
+			                    AND ${createdAt.toISOString()}::timestamptz + INTERVAL '7 days'
+		`)
+		.orderBy(items.createdAt)
+		.limit(limit);
 }
 
 // ── Clusters ───────────────────────────────────────────
@@ -102,15 +280,19 @@ export async function addItemToCluster(
 		.where(eq(clusters.id, clusterId));
 }
 
-export async function getItemsByCluster(clusterId: string): Promise<Item[]> {
-	const result = await db
+export async function getItemsByCluster(
+	clusterId: string,
+	limit?: number,
+): Promise<Item[]> {
+	const query = db
 		.select({ item: items })
 		.from(items)
 		.innerJoin(itemClusters, eq(items.id, itemClusters.itemId))
 		.where(eq(itemClusters.clusterId, clusterId))
-		.orderBy(desc(items.createdAt));
+		.orderBy(sql`${items.createdAt} DESC`);
 
-	return result.map((r) => r.item);
+	const results = limit ? await query.limit(limit) : await query;
+	return results.map((r) => r.item);
 }
 
 // ── Tags ───────────────────────────────────────────────

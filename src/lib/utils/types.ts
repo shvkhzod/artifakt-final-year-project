@@ -8,7 +8,9 @@ export interface Item {
 	type: ItemType;
 	thumbnailUrl: string | null;
 	note: string | null;
-	embedding: number[] | null;
+	textEmbedding: number[] | null;
+	imageEmbedding: number[] | null;
+	embeddingStatus: 'pending' | 'complete' | 'failed';
 	colorPalette: ColorPalette | null;
 	createdAt: Date;
 	updatedAt: Date;
@@ -34,6 +36,7 @@ export interface Cluster {
 	name: string;
 	color: string;
 	description: string | null;
+	source: 'ai' | 'user';
 	itemCount: number;
 	createdAt: Date;
 }
@@ -61,17 +64,6 @@ export interface Insight {
 	content: string;
 	clusterId: string | null;
 	createdAt: Date;
-}
-
-export interface EmbeddingResult {
-	vector: number[];
-	model: string;
-	dimensions: number;
-}
-
-export interface ClusterAssignment {
-	clusterId: string;
-	confidence: number;
 }
 
 export interface SimilarItem extends Item {

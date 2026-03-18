@@ -12,7 +12,24 @@
       "Bash(npx vite:*)",
       "Bash(sed -i \"s|style={isActive\\(link.href, $page.url.pathname\\) ? ''view-transition-name: nav-indicator'' : ''''}||\" src/lib/components/shared/NavBar.svelte)",
       "Bash(sed -i 's|style=\"\"view-transition-name: navbar\"\"||' src/lib/components/shared/NavBar.svelte)",
-      "Bash(bash \"C:/Users/lucky/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.4/skills/brainstorming/scripts/start-server.sh\" --project-dir \"/c/Another Disk/The FIles/Projects/coding/server/aina\")"
+      "Bash(bash \"C:/Users/lucky/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.4/skills/brainstorming/scripts/start-server.sh\" --project-dir \"/c/Another Disk/The FIles/Projects/coding/server/aina\")",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx svelte-kit:*)",
+      "Bash(npm run:*)",
+      "Bash(psql -U postgres -c 'CREATE DATABASE \"\"Aina\"\";')",
+      "Bash(psql -U postgres -d Aina -c 'CREATE EXTENSION IF NOT EXISTS vector;')",
+      "Bash(where pg_config)",
+      "Bash(pg_config --version)",
+      "Bash(docker:*)",
+      "Bash(DATABASE_URL=postgresql://postgres:postgres@localhost:5433/Aina npm run db:push)",
+      "Bash(npm ls:*)",
+      "Bash(node -e \":*)",
+      "Bash(npx -y @huggingface/transformers@3 -e \":*)",
+      "Bash(python3 -c \"import sys,json; data=json.load\\(sys.stdin\\); [print\\(f\"\"{r.get\\(''''similarity'''',0\\):.4f} | {r.get\\(''''title'''',''''?''''\\)[:60]}\"\"\\) for r in data.get\\(''''results'''',[]\\)]\")",
+      "Bash(source .env)",
+      "Bash(psql \"$DATABASE_URL\" -c \"SELECT COUNT\\(*\\) as total, COUNT\\(content_embedding\\) as has_content, COUNT\\(clip_embedding\\) as has_clip FROM items;\")",
+      "Bash(cat /c/Users/lucky/AppData/Local/Temp/claude/C--Another-Disk-The-FIles-Projects-coding-server-aina/*/tasks/*.output)"
     ]
   }
 }

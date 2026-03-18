@@ -1,7 +1,11 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import StreamGraph from '$lib/components/timeline/StreamGraph.svelte';
 	import ActivityHeatmap from '$lib/components/timeline/ActivityHeatmap.svelte';
-	import { CLUSTER_COLORS } from '$lib/utils/colors';
+	import * as appStore from '$lib/stores/appStore.svelte';
+	import EmptyState from '$lib/components/shared/EmptyState.svelte';
+
+	let { data }: { data?: any } = $props();
 
 	/* ── Types ────────────────────────────────────── */
 
@@ -22,102 +26,24 @@
 		streamId: string;
 	}
 
-	/* ── Stream definitions ──────────────────────── */
+	/* ── Wire to server loader data ─────────────── */
 
-	const streams: StreamDef[] = [
-		{ id: 'visual', name: 'Visual Aesthetics', color: CLUSTER_COLORS.amber },
-		{ id: 'design', name: 'Design Philosophy', color: CLUSTER_COLORS.cyan },
-		{ id: 'tech', name: 'Technology', color: CLUSTER_COLORS.emerald },
-		{ id: 'literature', name: 'Literature', color: CLUSTER_COLORS.mauve },
-		{ id: 'architecture', name: 'Architecture', color: CLUSTER_COLORS.blue },
-		{ id: 'music', name: 'Music & Sound', color: CLUSTER_COLORS.vermillion },
-	];
-
-	/* ── Demo data generation ────────────────────── */
-
-	function generateStreamData(): TimeSeriesData[] {
-		const points: TimeSeriesData[] = [];
-		const startDate = new Date('2025-03-17');
-
-		for (let w = 0; w < 52; w++) {
-			const date = new Date(startDate);
-			date.setDate(date.getDate() + w * 7);
-
-			const t = w / 52;
-
-			// Visual Aesthetics: high activity, gradually growing
-			const visual =
-				5 + 3 * Math.sin(t * Math.PI * 4) +
-				t * 6 +
-				Math.sin(t * Math.PI * 7.3) * 2 +
-				(Math.random() - 0.3) * 2;
-
-			// Design Philosophy: moderate, steady
-			const design =
-				3.5 + 2 * Math.sin(t * Math.PI * 3.2 + 1) +
-				Math.sin(t * Math.PI * 5.7) * 1.5 +
-				(Math.random() - 0.4) * 1.5;
-
-			// Technology: started low, big spike mid-timeline
-			const techSpike = Math.exp(-Math.pow((t - 0.46) * 5, 2)) * 10;
-			const tech =
-				1 + t * 3 + techSpike +
-				Math.sin(t * Math.PI * 6.1) * 1.5 +
-				(Math.random() - 0.3) * 1.2;
-
-			// Literature: low but constant
-			const literature =
-				1.5 + Math.sin(t * Math.PI * 2.8 + 2) * 1.2 +
-				Math.sin(t * Math.PI * 8.3) * 0.6 +
-				(Math.random() - 0.4) * 0.8;
-
-			// Architecture: periodic bursts
-			const archBurst1 = Math.exp(-Math.pow((t - 0.3) * 8, 2)) * 7;
-			const archBurst2 = Math.exp(-Math.pow((t - 0.62) * 8, 2)) * 9;
-			const archBurst3 = Math.exp(-Math.pow((t - 0.88) * 8, 2)) * 5;
-			const architecture =
-				0.8 + archBurst1 + archBurst2 + archBurst3 +
-				Math.sin(t * Math.PI * 4.5) * 0.8 +
-				(Math.random() - 0.4) * 1;
-
-			// Music & Sound: emerged recently, growing
-			const musicOnset = Math.max(0, (t - 0.55) * 3);
-			const music =
-				musicOnset * (3 + Math.sin(t * Math.PI * 5.2) * 2) +
-				(t > 0.55 ? (Math.random() - 0.3) * 1.5 : 0);
-
-			points.push({
-				date,
-				visual: Math.max(0.2, visual),
-				design: Math.max(0.2, design),
-				tech: Math.max(0.2, tech),
-				literature: Math.max(0.2, literature),
-				architecture: Math.max(0.2, architecture),
-				music: Math.max(0, music),
-			});
-		}
-
-		return points;
-	}
-
-	const allData = generateStreamData();
-
-	/* ── Moment markers ──────────────────────────── */
-
-	const moments: MomentMarker[] = [
-		{ date: allData[0].date as Date, label: 'First save', streamId: 'visual' },
-		{ date: allData[11].date as Date, label: 'Design deep-dive', streamId: 'design' },
-		{ date: allData[23].date as Date, label: 'AI obsession begins', streamId: 'tech' },
-		{ date: allData[31].date as Date, label: 'Brutalism phase', streamId: 'architecture' },
-		{ date: allData[43].date as Date, label: '100th save', streamId: 'visual' },
-	];
+	const streams: StreamDef[] = $derived(data?.streams ?? []);
+	const allData: TimeSeriesData[] = $derived(
+		(data?.weeks ?? []).map((w: any) => ({ ...w, date: new Date(w.date) }))
+	);
+	const moments: MomentMarker[] = [];
+	const heatmapData = $derived(
+		(data?.heatmapData ?? []).map((d: any) => ({ date: new Date(d.date), count: d.count }))
+	);
+	const insights: any[] = [];
 
 	/* ── Time range filter ───────────────────────── */
 
 	type TimeRange = '3M' | '6M' | '1Y' | 'ALL';
 	let activeRange: TimeRange = $state('1Y');
 
-	let filteredData = $derived(() => {
+	let filteredData = $derived.by(() => {
 		const weekCounts: Record<TimeRange, number> = {
 			'3M': 13,
 			'6M': 26,
@@ -128,10 +54,9 @@
 		return allData.slice(allData.length - count);
 	});
 
-	let filteredMoments = $derived(() => {
-		const d = filteredData();
-		if (d.length === 0) return [];
-		const startDate = d[0].date as Date;
+	let filteredMoments = $derived.by(() => {
+		if (filteredData.length === 0) return [];
+		const startDate = filteredData[0].date as Date;
 		return moments.filter((m) => m.date >= startDate);
 	});
 
@@ -139,49 +64,36 @@
 
 	let hoveredStream: string | null = $state(null);
 
-	/* ── Activity heatmap data ───────────────────── */
+	/* ── Search context ──────────────────────────── */
 
-	function generateHeatmapData(): { date: Date; count: number }[] {
-		const days: { date: Date; count: number }[] = [];
-		const startDate = new Date('2025-03-17');
-
-		for (let d = 0; d < 365; d++) {
-			const date = new Date(startDate);
-			date.setDate(date.getDate() + d);
-
-			const dayOfWeek = date.getDay();
-			const isWeekday = dayOfWeek > 0 && dayOfWeek < 6;
-			const t = d / 365;
-
-			// Base activity: weekdays higher
-			let base = isWeekday ? 1.5 : 0.5;
-
-			// Activity clusters
-			const cluster1 = Math.exp(-Math.pow((t - 0.15) * 10, 2)) * 4;
-			const cluster2 = Math.exp(-Math.pow((t - 0.45) * 8, 2)) * 6;
-			const cluster3 = Math.exp(-Math.pow((t - 0.7) * 7, 2)) * 5;
-			const cluster4 = Math.exp(-Math.pow((t - 0.9) * 9, 2)) * 4;
-
-			// Growing trend
-			const trend = t * 1.5;
-
-			let count = base + cluster1 + cluster2 + cluster3 + cluster4 + trend + (Math.random() - 0.3) * 2;
-			count = Math.max(0, Math.round(count));
-			count = Math.min(8, count);
-
-			days.push({ date, count });
+	function updateSearchContext() {
+		const now = new Date();
+		const rangeMonths: Record<TimeRange, number | null> = {
+			'3M': 3, '6M': 6, '1Y': 12, 'ALL': null,
+		};
+		const months = rangeMonths[activeRange];
+		if (months) {
+			const after = new Date(now);
+			after.setMonth(after.getMonth() - months);
+			appStore.setSearchContext({
+				page: 'timeline',
+				after: after.toISOString(),
+				before: now.toISOString(),
+			});
+		} else {
+			appStore.setSearchContext({ page: 'timeline' });
 		}
-
-		return days;
 	}
 
-	const heatmapData = generateHeatmapData();
+	onMount(() => {
+		updateSearchContext();
+	});
 
 	/* ── Stats ────────────────────────────────────── */
 
-	let totalItems = $derived(heatmapData.reduce((sum, d) => sum + d.count, 0));
-	let activeDays = $derived(heatmapData.filter((d) => d.count > 0).length);
-	let longestStreak = $derived(() => {
+	let totalItems = $derived(data?.totalItems ?? 0);
+	let activeDays = $derived(heatmapData.filter((d: any) => d.count > 0).length);
+	let longestStreak = $derived.by(() => {
 		let max = 0;
 		let current = 0;
 		for (const d of heatmapData) {
@@ -194,29 +106,6 @@
 		}
 		return max;
 	});
-
-	/* ── Insight cards ───────────────────────────── */
-
-	const insights = [
-		{
-			type: 'new_interest',
-			title: 'New Interest Detected',
-			description: 'Music & Sound appeared 5 months ago and is growing steadily. You\'ve saved 23 items in this area, mostly experimental ambient and generative compositions.',
-			color: CLUSTER_COLORS.emerald,
-		},
-		{
-			type: 'taste_shift',
-			title: 'Taste Shift',
-			description: 'Your Design Philosophy saves have evolved from minimalism toward more expressive, brutalist aesthetics. The shift began around August.',
-			color: CLUSTER_COLORS.cyan,
-		},
-		{
-			type: 'milestone',
-			title: 'Milestone',
-			description: 'You\'ve reached 100 saves in Visual Aesthetics, your most active interest. Photography and spatial composition dominate this cluster.',
-			color: CLUSTER_COLORS.amber,
-		},
-	];
 </script>
 
 <svelte:head>
@@ -234,7 +123,7 @@
 					class:active={activeRange === range}
 					role="tab"
 					aria-selected={activeRange === range}
-					onclick={() => (activeRange = range)}
+					onclick={() => { activeRange = range; updateSearchContext(); }}
 				>
 					{range}
 				</button>
@@ -244,12 +133,13 @@
 
 	<!-- ── Main content ────────────────────────── -->
 	<main class="timeline-content">
+		{#if streams.length === 0}<EmptyState heading="No history yet" subtitle="Your timeline builds as you save items over time" />{:else}
 		<!-- Stream Graph section -->
 		<section class="section stream-section" aria-label="Interest evolution">
 			<StreamGraph
-				data={filteredData()}
+				data={filteredData}
 				{streams}
-				moments={filteredMoments()}
+				moments={filteredMoments}
 				bind:hoveredStream
 			/>
 
@@ -302,7 +192,7 @@
 				</div>
 				<span class="stat-sep"></span>
 				<div class="stat">
-					<span class="stat-value">{longestStreak()}</span>
+					<span class="stat-value">{longestStreak}</span>
 					<span class="stat-label">day streak</span>
 				</div>
 			</div>
@@ -312,6 +202,7 @@
 		<footer class="closer">
 			<p class="closer-text">Your mind never stops evolving.</p>
 		</footer>
+		{/if}
 	</main>
 </div>
 

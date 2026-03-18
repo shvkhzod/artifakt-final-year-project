@@ -24,7 +24,7 @@ export const load: PageServerLoad = async () => {
 			const cluster = assignment ? clusterMap.get(assignment.clusterId) ?? null : null;
 			return {
 				...item,
-				cluster: cluster ? { name: cluster.name, color: cluster.color } : null,
+				cluster: cluster ? { id: cluster.id, name: cluster.name, color: cluster.color } : null,
 			};
 		});
 

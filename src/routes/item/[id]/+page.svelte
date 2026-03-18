@@ -1,7 +1,10 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
 	import * as appStore from '$lib/stores/appStore.svelte';
+	import ExplorationPaths from '$lib/components/shared/ExplorationPaths.svelte';
+	import ExplorationBreadcrumbs from '$lib/components/shared/ExplorationBreadcrumbs.svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -21,6 +24,46 @@
 			day: 'numeric',
 		});
 	}
+
+	let exploringItemId: string | null = $state(null);
+	let explorationTrail: Array<{ id: string; title: string | null; type: string }> = $state([]);
+	let exploringItemData: any = $state(null);
+
+	// The "active" item is either the exploring one or the server-loaded one
+	let activeItem = $derived(exploringItemData?.item ?? data.item);
+	let activeCluster = $derived(exploringItemData?.cluster ?? data.cluster);
+	let activeTags = $derived(exploringItemData?.tags ?? data.tags);
+
+	function handleExplore(detail: { id: string; title: string | null; type: string }) {
+		const current = exploringItemData?.item ?? data.item;
+		explorationTrail = [...explorationTrail, { id: current.id, title: current.title, type: current.type }];
+		exploringItemId = detail.id;
+		history.replaceState(null, '', `/item/${detail.id}`);
+		fetchItemData(detail.id);
+	}
+
+	function handleBreadcrumbNavigate(id: string, index: number) {
+		explorationTrail = explorationTrail.slice(0, index);
+		exploringItemId = id;
+		history.replaceState(null, '', `/item/${id}`);
+		fetchItemData(id);
+	}
+
+	async function fetchItemData(id: string) {
+		try {
+			const res = await fetch(`/api/items/${id}`);
+			if (res.ok) {
+				const item = await res.json();
+				exploringItemData = { item, cluster: null, tags: [], similarItems: [] };
+			}
+		} catch (e) {
+			console.error('Failed to fetch item:', e);
+		}
+	}
+
+	onMount(() => {
+		appStore.setSearchContext({ page: 'item', itemId: data.item.id });
+	});
 
 	function handleBack(e: MouseEvent) {
 		e.preventDefault();
@@ -52,35 +95,35 @@
 	<main class="item-content">
 		<!-- Item hero -->
 		<div class="item-hero">
-			{#if data.item.type === 'image' || data.item.type === 'screenshot'}
-				{#if data.item.url || data.item.thumbnailUrl}
+			{#if activeItem.type === 'image' || activeItem.type === 'screenshot'}
+				{#if activeItem.url || activeItem.thumbnailUrl}
 					<div class="hero-image-wrap" style="view-transition-name: item-hero">
 						<img
-							src={data.item.url || data.item.thumbnailUrl}
-							alt={data.item.title || 'Saved image'}
+							src={activeItem.url || activeItem.thumbnailUrl}
+							alt={activeItem.title || 'Saved image'}
 							class="hero-image"
 						/>
 					</div>
 				{/if}
-			{:else if data.item.type === 'quote'}
+			{:else if activeItem.type === 'quote'}
 				<div class="hero-quote" style="view-transition-name: item-hero">
 					<span class="quote-mark">&ldquo;</span>
-					<blockquote class="quote-text">{data.item.content}</blockquote>
-					{#if data.item.note}
-						<cite class="quote-author">&mdash; {data.item.note}</cite>
+					<blockquote class="quote-text">{activeItem.content}</blockquote>
+					{#if activeItem.note}
+						<cite class="quote-author">&mdash; {activeItem.note}</cite>
 					{/if}
 				</div>
-			{:else if data.item.type === 'article'}
+			{:else if activeItem.type === 'article'}
 				<div class="hero-article" style="view-transition-name: item-hero">
-					{#if data.item.title}
-						<h1 class="article-title" style="view-transition-name: item-title">{data.item.title}</h1>
+					{#if activeItem.title}
+						<h1 class="article-title" style="view-transition-name: item-title">{activeItem.title}</h1>
 					{/if}
-					{#if data.item.content}
-						<p class="article-excerpt">{data.item.content}</p>
+					{#if activeItem.content}
+						<p class="article-excerpt">{activeItem.content}</p>
 					{/if}
-					{#if data.item.url}
-						<a href={data.item.url} target="_blank" rel="noopener noreferrer" class="article-link">
-							{extractDomain(data.item.url)}
+					{#if activeItem.url}
+						<a href={activeItem.url} target="_blank" rel="noopener noreferrer" class="article-link">
+							{extractDomain(activeItem.url)}
 							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
 								<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
 								<polyline points="15 3 21 3 21 9" />
@@ -94,31 +137,31 @@
 
 		<!-- Meta row -->
 		<div class="meta-row">
-			{#if data.item.title && data.item.type !== 'article'}
-				<h1 class="item-title" style="view-transition-name: item-title">{data.item.title}</h1>
+			{#if activeItem.title && activeItem.type !== 'article'}
+				<h1 class="item-title" style="view-transition-name: item-title">{activeItem.title}</h1>
 			{/if}
 
 			<div class="meta-details">
-				<span class="meta-type">{data.item.type}</span>
+				<span class="meta-type">{activeItem.type}</span>
 				<span class="meta-sep">&middot;</span>
-				<span class="meta-date">{formatDate(data.item.createdAt)}</span>
+				<span class="meta-date">{formatDate(activeItem.createdAt)}</span>
 			</div>
 
-			{#if data.cluster}
-				<div class="meta-cluster" style="--cluster-color: {data.cluster.color}; view-transition-name: item-cluster">
+			{#if activeCluster}
+				<div class="meta-cluster" style="--cluster-color: {activeCluster.color}; view-transition-name: item-cluster">
 					<span class="cluster-dot"></span>
-					<span class="cluster-name">{data.cluster.name}</span>
+					<span class="cluster-name">{activeCluster.name}</span>
 					<span class="cluster-confidence">
-						{Math.round((data.cluster.confidence ?? 1) * 100)}% match
+						{Math.round((activeCluster.confidence ?? 1) * 100)}% match
 					</span>
 				</div>
 			{/if}
 		</div>
 
 		<!-- Tags -->
-		{#if data.tags.length > 0}
+		{#if activeTags.length > 0}
 			<div class="tags-section">
-				{#each data.tags as tag (tag.id)}
+				{#each activeTags as tag (tag.id)}
 					<span class="tag" class:tag-ai={tag.source === 'ai'}>
 						{tag.name}
 					</span>
@@ -127,44 +170,28 @@
 		{/if}
 
 		<!-- Note -->
-		{#if data.item.note && data.item.type !== 'quote'}
+		{#if activeItem.note && activeItem.type !== 'quote'}
 			<div class="note-section">
 				<h3 class="section-label">Note</h3>
-				<p class="note-text">{data.item.note}</p>
+				<p class="note-text">{activeItem.note}</p>
 			</div>
 		{/if}
 
-		<!-- Similar items -->
-		{#if data.similarItems.length > 0}
-			<div class="similar-section">
-				<h3 class="section-label">Similar Items</h3>
-				<div class="similar-grid">
-					{#each data.similarItems as similar (similar.id)}
-						<a href="/item/{similar.id}" class="similar-card">
-							{#if (similar.type === 'image' || similar.type === 'screenshot') && (similar.url || similar.thumbnailUrl)}
-								<div class="similar-image-wrap">
-									<img
-										src={similar.url || similar.thumbnailUrl}
-										alt={similar.title || 'Similar item'}
-										loading="lazy"
-									/>
-								</div>
-							{:else}
-								<div class="similar-text-wrap">
-									<span class="similar-type">{similar.type}</span>
-									{#if similar.title}
-										<span class="similar-title">{similar.title}</span>
-									{/if}
-								</div>
-							{/if}
-							<div class="similar-similarity">
-								{Math.round(similar.similarity * 100)}%
-							</div>
-						</a>
-					{/each}
-				</div>
-			</div>
+		<!-- Exploration -->
+		{#if explorationTrail.length > 0}
+			<ExplorationBreadcrumbs
+				trail={explorationTrail}
+				onnavigate={handleBreadcrumbNavigate}
+			/>
 		{/if}
+
+		<div class="exploration-section">
+			<ExplorationPaths
+				itemId={exploringItemId ?? data.item.id}
+				initialSemantic={!exploringItemId && data.similarItems?.length > 0 ? data.similarItems : undefined}
+				oncenter={handleExplore}
+			/>
+		</div>
 	</main>
 </div>
 
@@ -382,94 +409,17 @@
 		color: var(--text-secondary);
 	}
 
-	/* ── Similar Items ───────────────────────────── */
-	.similar-section {
+	/* ── Exploration ────────────────────────────── */
+	.exploration-section {
 		margin-top: var(--space-2xl);
 		padding-top: var(--space-xl);
 		border-top: 1px solid var(--border-subtle);
-	}
-
-	.similar-grid {
-		display: grid;
-		grid-template-columns: repeat(3, 1fr);
-		gap: var(--space-md);
-	}
-
-	.similar-card {
-		position: relative;
-		border-radius: var(--radius-md);
-		overflow: hidden;
-		background: var(--bg-surface-2);
-		border: 1px solid var(--border-subtle);
-		text-decoration: none;
-		transition: border-color var(--duration-fast) var(--ease-out),
-			transform var(--duration-fast) var(--ease-out);
-	}
-
-	.similar-card:hover {
-		border-color: var(--border-light);
-		transform: translateY(-2px);
-	}
-
-	.similar-image-wrap {
-		aspect-ratio: 4 / 3;
-		overflow: hidden;
-	}
-
-	.similar-image-wrap img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		display: block;
-	}
-
-	.similar-text-wrap {
-		padding: var(--space-md);
-		min-height: 100px;
-		display: flex;
-		flex-direction: column;
-		gap: var(--space-xs);
-	}
-
-	.similar-type {
-		font-size: var(--text-2xs);
-		font-weight: 500;
-		text-transform: uppercase;
-		letter-spacing: var(--tracking-wide);
-		color: var(--text-tertiary);
-	}
-
-	.similar-title {
-		font-size: var(--text-sm);
-		color: var(--text-primary);
-		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		line-clamp: 2;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
-	}
-
-	.similar-similarity {
-		position: absolute;
-		top: var(--space-xs);
-		right: var(--space-xs);
-		font-size: var(--text-2xs);
-		font-weight: 500;
-		color: var(--text-primary);
-		background: rgba(0, 0, 0, 0.6);
-		backdrop-filter: blur(8px);
-		padding: 2px 8px;
-		border-radius: var(--radius-full);
 	}
 
 	/* ── Responsive ──────────────────────────────── */
 	@media (max-width: 640px) {
 		.item-content {
 			padding: var(--space-lg) var(--space-md) var(--space-2xl);
-		}
-
-		.similar-grid {
-			grid-template-columns: repeat(2, 1fr);
 		}
 
 		.hero-quote {

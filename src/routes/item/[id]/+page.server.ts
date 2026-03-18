@@ -4,13 +4,9 @@ import { error } from '@sveltejs/kit';
 import { db, isDbAvailable } from '$lib/server/db';
 import { itemClusters, clusters } from '$lib/server/db/schema';
 import { eq } from 'drizzle-orm';
-import { getDemoItem } from '$lib/utils/demoData';
-
 export const load: PageServerLoad = async ({ params }) => {
 	if (!(await isDbAvailable())) {
-		const demo = getDemoItem(params.id);
-		if (demo) return demo;
-		throw error(404, 'Item not found');
+		throw error(503, 'Database not available');
 	}
 
 	let item;

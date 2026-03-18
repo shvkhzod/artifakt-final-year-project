@@ -99,10 +99,17 @@ export async function performSearch(query: string) {
 	searchDebounce = setTimeout(async () => {
 		_isSearching = true;
 		try {
-			const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+			const ctx = _searchContext;
+			const params = new URLSearchParams({ q: query });
+			if (ctx.clusterId) params.set('clusterId', ctx.clusterId);
+			if (ctx.after) params.set('after', ctx.after);
+			if (ctx.before) params.set('before', ctx.before);
+			if (ctx.page === 'library') params.set('groupByCluster', 'true');
+
+			const res = await fetch(`/api/search?${params}`);
 			if (res.ok) {
 				const data = await res.json();
-				_searchResults = data.results ?? data;
+				_searchResults = data.results ?? data.groups ?? data;
 			}
 		} catch (e) {
 			console.error('Search failed:', e);
@@ -122,4 +129,27 @@ export function getViewTransitionItemId() {
 
 export function setViewTransitionItemId(id: string | null) {
 	_viewTransitionItemId = id;
+}
+
+// ── Search Context ──
+// Set by each page, read by SearchOverlay for contextual scoping
+
+export interface SearchContext {
+	page: 'library' | 'tastemap' | 'timeline' | 'item';
+	clusterId?: string;
+	clusterName?: string;
+	clusterColor?: string;
+	after?: string;
+	before?: string;
+	itemId?: string;
+}
+
+let _searchContext: SearchContext = $state({ page: 'library' });
+
+export function getSearchContext() {
+	return _searchContext;
+}
+
+export function setSearchContext(ctx: SearchContext) {
+	_searchContext = ctx;
 }

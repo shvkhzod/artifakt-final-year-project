@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { getClusters, getItems } from '$lib/server/db/queries';
 import { db } from '$lib/server/db';
 import { itemClusters } from '$lib/server/db/schema';
+import { runRecluster } from '$lib/server/ai';
 
 export const GET: RequestHandler = async () => {
 	try {
@@ -32,5 +33,15 @@ export const GET: RequestHandler = async () => {
 	} catch (e) {
 		console.error('Failed to fetch clusters data:', e);
 		throw error(500, 'Failed to fetch clusters data');
+	}
+};
+
+export const POST: RequestHandler = async () => {
+	try {
+		await runRecluster('manual');
+		return json({ success: true });
+	} catch (e) {
+		console.error('Recluster failed:', e);
+		throw error(500, 'Recluster failed');
 	}
 };
