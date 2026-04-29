@@ -1,7 +1,7 @@
 import { eq, sql, desc, and } from 'drizzle-orm';
 import { db } from './index';
-import { items, clusters, itemClusters, tags, itemTags } from './schema';
-import type { Item, NewItem, Cluster, NewCluster, Tag } from './schema';
+import { items, clusters, itemClusters, tags, itemTags, fragments } from './schema';
+import type { Item, NewItem, Cluster, NewCluster, Tag, Fragment, NewFragment } from './schema';
 
 export function stripEmbeddings<T extends Record<string, any>>(item: T): T {
 	const copy = { ...item };
@@ -101,7 +101,7 @@ export async function updateContentEmbedding(
 export async function updateSearchText(id: string): Promise<void> {
 	await db.execute(sql`
 		UPDATE items SET search_text = to_tsvector('english',
-			coalesce(title, '') || ' ' || coalesce(content, '') || ' ' || coalesce(ai_caption, '')
+			coalesce(title, '') || ' ' || coalesce(content, '') || ' ' || coalesce(note, '') || ' ' || coalesce(ai_caption, '')
 		) WHERE id = ${id}
 	`);
 }
@@ -115,12 +115,13 @@ export async function searchHybrid(
 	const result = await db.execute(sql`
 		SELECT *,
 			(1 - (content_embedding <=> ${vectorStr}::vector)) as semantic_score,
-			ts_rank(search_text, plainto_tsquery('english', ${queryText})) as keyword_score,
+			ts_rank(search_text::tsvector, plainto_tsquery('english', ${queryText})) as keyword_score,
 			(1 - (content_embedding <=> ${vectorStr}::vector))
-				+ (ts_rank(search_text, plainto_tsquery('english', ${queryText})) * 2.0)
+				+ (ts_rank(search_text::tsvector, plainto_tsquery('english', ${queryText})) * 2.0)
 				as similarity
 		FROM items
 		WHERE content_embedding IS NOT NULL
+			AND (1 - (content_embedding <=> ${vectorStr}::vector)) >= 0.30
 		ORDER BY similarity DESC
 		LIMIT ${limit}
 	`);
@@ -200,6 +201,31 @@ export async function findNearestNeighborsByClip(
 	}>;
 }
 
+export async function findNearestNeighborsByContent(
+	embedding: number[],
+	k: number = 5,
+): Promise<Array<{ item_id: string; cluster_id: string | null; confidence: number; similarity: number }>> {
+	const vectorStr = `[${embedding.join(',')}]`;
+	const result = await db.execute(sql`
+		SELECT
+			i.id as item_id,
+			ic.cluster_id,
+			COALESCE(ic.confidence, 0) as confidence,
+			1 - (i.content_embedding <=> ${vectorStr}::vector) as similarity
+		FROM items i
+		LEFT JOIN item_clusters ic ON i.id = ic.item_id
+		WHERE i.content_embedding IS NOT NULL
+		ORDER BY i.content_embedding <=> ${vectorStr}::vector
+		LIMIT ${k}
+	`);
+	return (result.rows ?? result) as Array<{
+		item_id: string;
+		cluster_id: string | null;
+		confidence: number;
+		similarity: number;
+	}>;
+}
+
 export async function searchSimilarByClip(
 	embedding: number[],
 	limit: number = 10,
@@ -231,23 +257,6 @@ export async function setEmbeddingStatus(
 		.update(items)
 		.set({ embeddingStatus: status, updatedAt: new Date() })
 		.where(eq(items.id, id));
-}
-
-export async function getTemporalNeighbors(
-	itemId: string,
-	createdAt: Date,
-	limit: number = 5,
-): Promise<Item[]> {
-	return db
-		.select()
-		.from(items)
-		.where(sql`
-			id != ${itemId}
-			AND created_at BETWEEN ${createdAt.toISOString()}::timestamptz - INTERVAL '7 days'
-			                    AND ${createdAt.toISOString()}::timestamptz + INTERVAL '7 days'
-		`)
-		.orderBy(items.createdAt)
-		.limit(limit);
 }
 
 // ── Clusters ───────────────────────────────────────────
@@ -326,4 +335,43 @@ export async function getItemTags(itemId: string): Promise<Tag[]> {
 		.where(eq(itemTags.itemId, itemId));
 
 	return result.map((r) => r.tag);
+}
+
+// ── Fragments ─────────────────────────────────────────
+
+export async function createFragments(
+	itemId: string,
+	data: Array<Omit<NewFragment, 'itemId'>>,
+): Promise<Fragment[]> {
+	if (data.length === 0) return [];
+	const rows = data.map((d) => ({ ...d, itemId }));
+	return db.insert(fragments).values(rows).returning();
+}
+
+export async function getFragmentsByItemId(itemId: string): Promise<Fragment[]> {
+	return db
+		.select()
+		.from(fragments)
+		.where(eq(fragments.itemId, itemId))
+		.orderBy(fragments.category, fragments.sortOrder);
+}
+
+export async function getFragmentById(id: string): Promise<Fragment | undefined> {
+	const [fragment] = await db.select().from(fragments).where(eq(fragments.id, id));
+	return fragment;
+}
+
+export async function deleteFragment(id: string): Promise<void> {
+	await db.delete(fragments).where(eq(fragments.id, id));
+}
+
+export async function deleteFragmentsByItemId(itemId: string): Promise<void> {
+	await db.delete(fragments).where(eq(fragments.itemId, itemId));
+}
+
+export async function setDissectedAt(itemId: string): Promise<void> {
+	await db
+		.update(items)
+		.set({ dissectedAt: new Date(), updatedAt: new Date() })
+		.where(eq(items.id, itemId));
 }

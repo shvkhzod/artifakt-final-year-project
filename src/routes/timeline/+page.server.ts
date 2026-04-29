@@ -2,8 +2,13 @@ import type { PageServerLoad } from './$types';
 import { getItems, getClusters } from '$lib/server/db/queries';
 import { db, isDbAvailable } from '$lib/server/db';
 import { itemClusters } from '$lib/server/db/schema';
+import { buildDemoData } from './demoData';
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({ url }) => {
+	if (url.searchParams.get('demo') === '1') {
+		return buildDemoData();
+	}
+
 	if (!(await isDbAvailable())) {
 		return { weeks: [], streams: [], clusters: [], items: [], heatmapData: [], totalItems: 0 };
 	}

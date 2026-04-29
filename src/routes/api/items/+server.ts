@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { createItem, getItems, stripEmbeddings } from '$lib/server/db/queries';
 import type { NewItem } from '$lib/server/db/schema';
 import { z } from 'zod';
+import { isYouTubeUrl } from '$lib/utils/youtube';
 
 export const GET: RequestHandler = async ({ url }) => {
 	const limit = parseInt(url.searchParams.get('limit') || '50');
@@ -20,12 +21,12 @@ export const GET: RequestHandler = async ({ url }) => {
 };
 
 const itemSchema = z.object({
-	url: z.string().url().optional(),
-	title: z.string().optional(),
-	content: z.string().optional(),
-	type: z.enum(['image', 'article', 'quote', 'screenshot']),
-	thumbnailUrl: z.string().optional(),
-	note: z.string().optional(),
+	url: z.string().url().nullish(),
+	title: z.string().nullish(),
+	content: z.string().nullish(),
+	type: z.enum(['image', 'article', 'quote', 'screenshot', 'video']),
+	thumbnailUrl: z.string().nullish(),
+	note: z.string().nullish(),
 	colorPalette: z.any().optional(),
 });
 
@@ -65,7 +66,13 @@ export const POST: RequestHandler = async ({ request }) => {
 			throw error(400, `Validation error: ${parsed.error.issues.map((i) => i.message).join(', ')}`);
 		}
 
-		const { url, title, content, type, thumbnailUrl, note, colorPalette } = parsed.data;
+		const { url, title, content, thumbnailUrl, note, colorPalette } = parsed.data;
+		let { type } = parsed.data;
+
+		// Auto-detect YouTube URLs
+		if (url && isYouTubeUrl(url) && type === 'article') {
+			type = 'video';
+		}
 
 		// If URL provided and no title/content, fetch metadata
 		if (url && !title) {

@@ -1,4 +1,4 @@
-import { findNearestNeighborsByClip, addItemToCluster } from '$lib/server/db/queries';
+import { findNearestNeighborsByContent, addItemToCluster } from '$lib/server/db/queries';
 import { AI_CONFIG } from '../config';
 
 interface AssignmentResult {
@@ -12,7 +12,8 @@ export async function assignItemToCluster(
 ): Promise<AssignmentResult | null> {
   const { assignmentK, assignmentThreshold } = AI_CONFIG.clustering;
 
-  const neighbors = await findNearestNeighborsByClip(embedding, assignmentK);
+  // Use content_embedding (semantic meaning) instead of clip_embedding (visual similarity)
+  const neighbors = await findNearestNeighborsByContent(embedding, assignmentK);
 
   const assigned = neighbors.filter((n) => n.cluster_id !== null && n.item_id !== itemId);
   if (assigned.length === 0) return null;
@@ -39,6 +40,7 @@ export async function assignItemToCluster(
     }
   }
 
+  // If best similarity is below threshold, leave item uncategorized
   if (!bestCluster || bestAvgSim < assignmentThreshold) return null;
 
   const confidence = Math.min(1, Math.max(0.1, (bestCount / assigned.length) * bestAvgSim));

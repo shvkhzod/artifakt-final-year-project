@@ -28,9 +28,12 @@ export const GET: RequestHandler = async ({ url }) => {
     let results = await searchHybrid(embedding, query, limit * 2);
     results = results.map(stripEmbeddings) as typeof results;
 
-    // Filter on combined score (semantic + keyword boost)
-    const SIMILARITY_THRESHOLD = 0.40;
-    results = results.filter((r) => r.similarity >= SIMILARITY_THRESHOLD);
+    // Filter: require genuine relevance.
+    // If there's a keyword hit, keep it (the query text literally appears in the item).
+    // If no keyword hit, require high semantic similarity (0.55+) to avoid noise.
+    results = results.filter((r) =>
+      r.keyword_score > 0 || r.semantic_score >= 0.55
+    );
 
     // Apply date scoping
     if (after) {

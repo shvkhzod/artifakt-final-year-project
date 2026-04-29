@@ -60,7 +60,7 @@
 <nav class="navbar" aria-label="Main navigation" style="view-transition-name: navbar">
 	<div class="navbar-inner">
 		<!-- Left: Logo -->
-		<a href="/" class="navbar-logo">Aina</a>
+		<a href="/" class="navbar-logo">Artifakt</a>
 
 		<!-- Center: Nav links (desktop) -->
 		<div class="navbar-links" bind:this={linksContainer}>

@@ -12,7 +12,6 @@ let _toastMessage: string = $state('');
 let _toastType: 'success' | 'error' | 'info' = $state('info');
 let _toastVisible: boolean = $state(false);
 let _quickAddOpen: boolean = $state(false);
-
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 let searchDebounce: ReturnType<typeof setTimeout> | undefined;
 
@@ -45,7 +44,6 @@ export function getToastVisible() {
 export function getQuickAddOpen() {
 	return _quickAddOpen;
 }
-
 // ── Actions ──
 
 export function showToast(message: string, type: 'success' | 'error' | 'info' = 'info') {

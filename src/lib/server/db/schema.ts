@@ -33,7 +33,7 @@ export const items = pgTable('items', {
 	url: text('url'),
 	title: text('title'),
 	content: text('content'),
-	type: text('type', { enum: ['image', 'article', 'quote', 'screenshot'] }).notNull(),
+	type: text('type', { enum: ['image', 'article', 'quote', 'screenshot', 'video'] }).notNull(),
 	thumbnailUrl: text('thumbnail_url'),
 	note: text('note'),
 	textEmbedding: pgVector(1024)('text_embedding'),
@@ -48,6 +48,7 @@ export const items = pgTable('items', {
 	colorPalette: jsonb('color_palette').$type<{ dominant: string; colors: string[] }>(),
 	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 	updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+	dissectedAt: timestamp('dissected_at', { withTimezone: true }),
 });
 
 // Clusters table
@@ -122,6 +123,30 @@ export const clusterRuns = pgTable('cluster_runs', {
 
 export type ClusterRun = InferSelectModel<typeof clusterRuns>;
 export type NewClusterRun = InferInsertModel<typeof clusterRuns>;
+
+// Arena cache table
+export const arenaCache = pgTable('arena_cache', {
+	cacheKey: text('cache_key').primaryKey(),
+	data: jsonb('data').notNull(),
+	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type ArenaCacheEntry = InferSelectModel<typeof arenaCache>;
+
+// Fragments table (Dissect feature)
+export const fragments = pgTable('fragments', {
+	id: uuid('id').primaryKey().defaultRandom(),
+	itemId: uuid('item_id').notNull().references(() => items.id, { onDelete: 'cascade' }),
+	category: text('category').notNull(),
+	label: text('label').notNull(),
+	content: text('content').notNull(),
+	metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+	sortOrder: integer('sort_order').notNull().default(0),
+	createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type Fragment = InferSelectModel<typeof fragments>;
+export type NewFragment = InferInsertModel<typeof fragments>;
 
 // Inferred types
 export type Item = InferSelectModel<typeof items>;

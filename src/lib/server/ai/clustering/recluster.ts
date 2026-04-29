@@ -26,52 +26,94 @@ function cosineDistance(a: number[], b: number[]): number {
 }
 
 export async function shouldRecluster(): Promise<boolean> {
+  // Use content_embedding for clustering (semantic meaning, not visual similarity)
+  const [{ count: embeddedCount }] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(items)
+    .where(isNotNull(items.contentEmbedding));
+
+  const totalEmbedded = Number(embeddedCount);
+
+  // Don't cluster until we have enough items for meaningful grouping
+  if (totalEmbedded < AI_CONFIG.clustering.minItemsForClustering) {
+    return false;
+  }
+
+  // Cold start: no clusters exist yet — always recluster
+  const [{ count: clusterCount }] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(clusters);
+
+  if (Number(clusterCount) === 0) {
+    return true;
+  }
+
+  // Check how many items are unassigned — if many items lack clusters, recluster
+  const [{ count: assignedCount }] = await db
+    .select({ count: sql<number>`COUNT(DISTINCT item_id)` })
+    .from(itemClusters);
+
+  const unassigned = totalEmbedded - Number(assignedCount);
+  if (unassigned >= AI_CONFIG.clustering.reclusterInterval) {
+    return true;
+  }
+
+  // Also check against the last run for the interval-based trigger
   const [latestRun] = await db
     .select()
     .from(clusterRuns)
     .orderBy(sql`created_at DESC`)
     .limit(1);
 
-  const [{ count: embeddedCount }] = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(items)
-    .where(isNotNull(items.clipEmbedding));
-
-  const totalEmbedded = Number(embeddedCount);
   const lastProcessed = latestRun?.itemsProcessed ?? 0;
-  const newItems = totalEmbedded - lastProcessed;
-
-  // Cold start: no clusters exist yet — recluster as soon as we have enough items
-  const [{ count: clusterCount }] = await db
-    .select({ count: sql<number>`COUNT(*)` })
-    .from(clusters);
-
-  if (Number(clusterCount) === 0 && totalEmbedded >= AI_CONFIG.clustering.minClusterSize) {
-    return true;
-  }
-
-  return newItems >= AI_CONFIG.clustering.reclusterInterval;
+  return (totalEmbedded - lastProcessed) >= AI_CONFIG.clustering.reclusterInterval;
 }
 
 export async function runRecluster(triggeredBy: 'auto' | 'manual' = 'auto'): Promise<void> {
   const startTime = performance.now();
 
-  // Use unified CLIP embeddings — all items (text + images) in one space
-  const allItems = await db.select().from(items).where(isNotNull(items.clipEmbedding));
+  // Use content_embedding (semantic meaning from captions/text) instead of clip_embedding (visual features)
+  const allItems = await db.select().from(items).where(isNotNull(items.contentEmbedding));
   const existingClusters = await db.select().from(clusters);
   const existingAssignments = await db.select().from(itemClusters);
+
+  // Clear all AI-generated assignments before reclustering.
+  // User-pinned cluster assignments are preserved inside clusterItemSet.
+  const userClusterIds = existingClusters
+    .filter((c) => c.source === 'user')
+    .map((c) => c.id);
+
+  if (userClusterIds.length > 0) {
+    await db.delete(itemClusters).where(
+      sql`cluster_id NOT IN (${sql.join(userClusterIds.map((id) => sql`${id}::uuid`), sql`, `)})`
+    );
+  } else {
+    await db.delete(itemClusters);
+  }
+
+  // Remove empty AI clusters
+  for (const c of existingClusters) {
+    if (c.source === 'ai') {
+      await db.delete(clusters).where(sql`id = ${c.id}`);
+    }
+  }
 
   let clustersCreated = 0;
   let clustersModified = 0;
 
-  if (allItems.length >= AI_CONFIG.clustering.minClusterSize) {
+  // Enforce minimum item count for clustering
+  if (allItems.length >= AI_CONFIG.clustering.minItemsForClustering) {
     const r = await clusterItemSet(
-      allItems.map((i) => ({ id: i.id, embedding: i.clipEmbedding! })),
-      existingClusters,
-      existingAssignments,
+      allItems.map((i) => ({ id: i.id, embedding: i.contentEmbedding! })),
+      existingClusters.filter((c) => c.source === 'user'),
+      existingAssignments.filter((a) => userClusterIds.includes(a.clusterId)),
     );
     clustersCreated += r.created;
     clustersModified += r.modified;
+  } else {
+    console.log(
+      `Skipping clustering: only ${allItems.length} items, need ${AI_CONFIG.clustering.minItemsForClustering}`,
+    );
   }
 
   const durationMs = Math.round(performance.now() - startTime);
@@ -95,7 +137,7 @@ async function clusterItemSet(
   existingClusters: Array<{ id: string; name: string; source: string }>,
   existingAssignments: Array<{ itemId: string; clusterId: string }>,
 ): Promise<{ created: number; modified: number }> {
-  if (itemSet.length < AI_CONFIG.clustering.minClusterSize) {
+  if (itemSet.length < AI_CONFIG.clustering.minItemsForClustering) {
     return { created: 0, modified: 0 };
   }
 
@@ -109,11 +151,13 @@ async function clusterItemSet(
   }
 
   const tree = agnes(distMatrix, { method: 'average', isDistanceMatrix: true });
-  // With few items, put them all in one group rather than splitting below minClusterSize
-  const numGroups = itemSet.length < AI_CONFIG.clustering.minClusterSize * 2
-    ? 1
-    : Math.max(2, Math.round(itemSet.length / 5));
-  const cutResult = tree.group(numGroups);
+
+  // Over-segment initially so dissimilar items land in separate groups.
+  // The similarity gate below will filter out weak groups.
+  // Final cluster count is capped by maxClustersRatio.
+  const maxClusters = Math.floor(itemSet.length / AI_CONFIG.clustering.maxClustersRatio);
+  const initialGroups = Math.max(maxClusters, Math.ceil(itemSet.length / 2));
+  const cutResult = tree.group(Math.min(initialGroups, itemSet.length));
 
   const labels = new Array<number>(itemSet.length).fill(0);
   function assignLabels(node: any, label: number) {
@@ -146,6 +190,9 @@ async function clusterItemSet(
   let modified = 0;
 
   for (const [, memberIds] of proposedGroups) {
+    // Stop if we've hit the max cluster cap
+    if (created >= maxClusters) break;
+    // Minimum 2 items per cluster — no single-item clusters
     if (memberIds.length < AI_CONFIG.clustering.minClusterSize) continue;
 
     // Protect items in user-pinned clusters
@@ -179,7 +226,7 @@ async function clusterItemSet(
       }
       modified++;
     } else {
-      // Compute centroid for naming samples
+      // Compute centroid for similarity gating and naming
       const groupEmbeddings = reassignableIds.map((id) => {
         const idx = itemSet.findIndex((i) => i.id === id);
         return itemSet[idx].embedding;
@@ -195,6 +242,14 @@ async function clusterItemSet(
       withDist.sort((a, b) => a.dist - b.dist);
       const sampleIds = withDist.slice(0, AI_CONFIG.clustering.namingSampleSize).map((d) => d.id);
 
+      // Similarity gate: only include items with similarity >= reclusterSimilarityThreshold
+      // (cosine distance <= 1 - threshold)
+      const maxDist = 1 - AI_CONFIG.clustering.reclusterSimilarityThreshold;
+      const closeEnough = withDist.filter((d) => d.dist <= maxDist);
+
+      // Need at least minClusterSize items that are actually similar
+      if (closeEnough.length < AI_CONFIG.clustering.minClusterSize) continue;
+
       const sampleItems = await db
         .select()
         .from(items)
@@ -208,11 +263,12 @@ async function clusterItemSet(
         color,
         source: 'ai',
         description: null,
-        itemCount: reassignableIds.length,
+        itemCount: closeEnough.length,
       });
 
-      for (const itemId of reassignableIds) {
-        await addItemToCluster(itemId, newCluster.id, 0.75);
+      for (const { id: itemId, dist } of closeEnough) {
+        const confidence = Math.min(1, Math.max(0.1, 1 - dist));
+        await addItemToCluster(itemId, newCluster.id, confidence);
       }
 
       created++;

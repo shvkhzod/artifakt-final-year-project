@@ -1,4 +1,4 @@
-export type ItemType = 'image' | 'article' | 'quote' | 'screenshot';
+export type ItemType = 'image' | 'article' | 'quote' | 'screenshot' | 'video';
 
 export interface Item {
 	id: string;
@@ -94,3 +94,29 @@ export interface TimelineEntry {
 	items: Item[];
 	insight: Insight | null;
 }
+
+// Fragment categories by content type
+export type ArticleFragmentCategory = 'argument' | 'concept' | 'entity' | 'quote' | 'reference' | 'tension';
+export type ImageFragmentCategory = 'subject' | 'palette' | 'composition' | 'style' | 'reference' | 'typography';
+export type QuoteFragmentCategory = 'theme' | 'concept' | 'tension' | 'implication';
+export type FragmentCategory = ArticleFragmentCategory | ImageFragmentCategory | QuoteFragmentCategory;
+
+export interface Fragment {
+	id: string;
+	itemId: string;
+	category: string;
+	label: string;
+	content: string;
+	metadata: Record<string, unknown> | null;
+	sortOrder: number;
+	createdAt: Date;
+}
+
+export const CATEGORIES_BY_TYPE: Record<string, string[]> = {
+	article: ['argument', 'concept', 'entity', 'quote', 'reference', 'tension'],
+	video: ['argument', 'concept', 'entity', 'quote', 'reference', 'tension'],
+	image: ['subject', 'palette', 'composition', 'style', 'reference', 'typography'],
+	screenshot: ['subject', 'palette', 'composition', 'style', 'reference', 'typography'],
+	quote: ['theme', 'concept', 'tension', 'implication'],
+	text: ['argument', 'concept', 'entity', 'quote', 'reference', 'tension'],
+};

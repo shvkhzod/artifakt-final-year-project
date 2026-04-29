@@ -32,11 +32,13 @@
 	const allData: TimeSeriesData[] = $derived(
 		(data?.weeks ?? []).map((w: any) => ({ ...w, date: new Date(w.date) }))
 	);
-	const moments: MomentMarker[] = [];
+	const moments: MomentMarker[] = $derived(
+		(data?.moments ?? []).map((m: any) => ({ ...m, date: new Date(m.date) }))
+	);
 	const heatmapData = $derived(
 		(data?.heatmapData ?? []).map((d: any) => ({ date: new Date(d.date), count: d.count }))
 	);
-	const insights: any[] = [];
+	const insights: any[] = $derived(data?.insights ?? []);
 
 	/* ── Time range filter ───────────────────────── */
 
@@ -162,7 +164,7 @@
 		<section class="section insights-section" aria-label="Insights">
 			<h2 class="section-title">Insights</h2>
 			<div class="insights-grid">
-				{#each insights as insight, idx (insight.type)}
+				{#each insights as insight, idx (insight.title)}
 					<article
 						class="insight-card"
 						class:insight-featured={idx === 0}

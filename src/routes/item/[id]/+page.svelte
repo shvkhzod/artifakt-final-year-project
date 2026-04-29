@@ -3,8 +3,8 @@
 	import { goto } from '$app/navigation';
 	import type { PageData } from './$types';
 	import * as appStore from '$lib/stores/appStore.svelte';
-	import ExplorationPaths from '$lib/components/shared/ExplorationPaths.svelte';
-	import ExplorationBreadcrumbs from '$lib/components/shared/ExplorationBreadcrumbs.svelte';
+	import DissectSection from '$lib/components/shared/DissectSection.svelte';
+	import { extractYouTubeId, youtubeEmbedUrl } from '$lib/utils/youtube';
 
 	let { data }: { data: PageData } = $props();
 
@@ -25,40 +25,33 @@
 		});
 	}
 
-	let exploringItemId: string | null = $state(null);
-	let explorationTrail: Array<{ id: string; title: string | null; type: string }> = $state([]);
-	let exploringItemData: any = $state(null);
+	let confirmingDelete = $state(false);
+	let deleting = $state(false);
 
-	// The "active" item is either the exploring one or the server-loaded one
-	let activeItem = $derived(exploringItemData?.item ?? data.item);
-	let activeCluster = $derived(exploringItemData?.cluster ?? data.cluster);
-	let activeTags = $derived(exploringItemData?.tags ?? data.tags);
-
-	function handleExplore(detail: { id: string; title: string | null; type: string }) {
-		const current = exploringItemData?.item ?? data.item;
-		explorationTrail = [...explorationTrail, { id: current.id, title: current.title, type: current.type }];
-		exploringItemId = detail.id;
-		history.replaceState(null, '', `/item/${detail.id}`);
-		fetchItemData(detail.id);
-	}
-
-	function handleBreadcrumbNavigate(id: string, index: number) {
-		explorationTrail = explorationTrail.slice(0, index);
-		exploringItemId = id;
-		history.replaceState(null, '', `/item/${id}`);
-		fetchItemData(id);
-	}
-
-	async function fetchItemData(id: string) {
-		try {
-			const res = await fetch(`/api/items/${id}`);
-			if (res.ok) {
-				const item = await res.json();
-				exploringItemData = { item, cluster: null, tags: [], similarItems: [] };
-			}
-		} catch (e) {
-			console.error('Failed to fetch item:', e);
+	async function handleDelete() {
+		if (!confirmingDelete) {
+			confirmingDelete = true;
+			return;
 		}
+		deleting = true;
+		try {
+			const res = await fetch(`/api/items/${data.item.id}`, { method: 'DELETE' });
+			if (res.ok) {
+				appStore.showToast('Item deleted', 'success');
+				goto('/');
+			} else {
+				appStore.showToast('Failed to delete', 'error');
+			}
+		} catch {
+			appStore.showToast('Failed to delete', 'error');
+		} finally {
+			deleting = false;
+			confirmingDelete = false;
+		}
+	}
+
+	function cancelDelete() {
+		confirmingDelete = false;
 	}
 
 	onMount(() => {
@@ -71,7 +64,6 @@
 			goto('/');
 			return;
 		}
-		// Tell the Library page which card to tag for the reverse morph
 		appStore.setViewTransitionItemId(data.item.id);
 		document.startViewTransition(() => goto('/'));
 	}
@@ -90,40 +82,73 @@
 			</svg>
 			<span>Library</span>
 		</a>
+		<div class="top-bar-actions">
+			{#if confirmingDelete}
+				<button class="delete-btn delete-btn--confirm" onclick={handleDelete} disabled={deleting}>
+					{deleting ? 'Deleting...' : 'Confirm delete'}
+				</button>
+				<button class="delete-btn delete-btn--cancel" onclick={cancelDelete}>
+					Cancel
+				</button>
+			{:else}
+				<button class="delete-btn" onclick={handleDelete} aria-label="Delete item">
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+						<polyline points="3 6 5 6 21 6" />
+						<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+					</svg>
+				</button>
+			{/if}
+		</div>
 	</header>
 
 	<main class="item-content">
 		<!-- Item hero -->
 		<div class="item-hero">
-			{#if activeItem.type === 'image' || activeItem.type === 'screenshot'}
-				{#if activeItem.url || activeItem.thumbnailUrl}
+			{#if data.item.type === 'video'}
+				{@const videoId = data.item.url ? extractYouTubeId(data.item.url) : null}
+				{#if videoId}
+					<div class="hero-video-wrap" style="view-transition-name: item-hero">
+						<iframe
+							src={youtubeEmbedUrl(videoId)}
+							title={data.item.title || 'Video'}
+							frameborder="0"
+							allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+							allowfullscreen
+						></iframe>
+					</div>
+				{/if}
+				{#if data.item.content}
+					<p class="video-description">{data.item.content}</p>
+				{/if}
+			{:else if data.item.type === 'image' || data.item.type === 'screenshot'}
+				{#if data.item.url || data.item.thumbnailUrl}
 					<div class="hero-image-wrap" style="view-transition-name: item-hero">
 						<img
-							src={activeItem.url || activeItem.thumbnailUrl}
-							alt={activeItem.title || 'Saved image'}
+							src={data.item.url || data.item.thumbnailUrl}
+							alt={data.item.title || 'Saved image'}
 							class="hero-image"
 						/>
 					</div>
 				{/if}
-			{:else if activeItem.type === 'quote'}
+			{:else if data.item.type === 'quote'}
 				<div class="hero-quote" style="view-transition-name: item-hero">
 					<span class="quote-mark">&ldquo;</span>
-					<blockquote class="quote-text">{activeItem.content}</blockquote>
-					{#if activeItem.note}
-						<cite class="quote-author">&mdash; {activeItem.note}</cite>
+					<blockquote class="quote-text">{data.item.content}</blockquote>
+					{#if data.item.note}
+						<cite class="quote-author">&mdash; {data.item.note}</cite>
 					{/if}
 				</div>
-			{:else if activeItem.type === 'article'}
+			{:else if data.item.type === 'article'}
 				<div class="hero-article" style="view-transition-name: item-hero">
-					{#if activeItem.title}
-						<h1 class="article-title" style="view-transition-name: item-title">{activeItem.title}</h1>
+					{#if data.item.title}
+						<h1 class="article-title" style="view-transition-name: item-title">{data.item.title}</h1>
 					{/if}
-					{#if activeItem.content}
-						<p class="article-excerpt">{activeItem.content}</p>
+					{#if data.item.content}
+						<p class="article-excerpt">{data.item.content}</p>
 					{/if}
-					{#if activeItem.url}
-						<a href={activeItem.url} target="_blank" rel="noopener noreferrer" class="article-link">
-							{extractDomain(activeItem.url)}
+					{#if data.item.url}
+						<a href={data.item.url} target="_blank" rel="noopener noreferrer" class="article-link">
+							{extractDomain(data.item.url)}
 							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
 								<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
 								<polyline points="15 3 21 3 21 9" />
@@ -137,31 +162,31 @@
 
 		<!-- Meta row -->
 		<div class="meta-row">
-			{#if activeItem.title && activeItem.type !== 'article'}
-				<h1 class="item-title" style="view-transition-name: item-title">{activeItem.title}</h1>
+			{#if data.item.title && data.item.type !== 'article'}
+				<h1 class="item-title" style="view-transition-name: item-title">{data.item.title}</h1>
 			{/if}
 
 			<div class="meta-details">
-				<span class="meta-type">{activeItem.type}</span>
+				<span class="meta-type">{data.item.type}</span>
 				<span class="meta-sep">&middot;</span>
-				<span class="meta-date">{formatDate(activeItem.createdAt)}</span>
+				<span class="meta-date">{formatDate(data.item.createdAt)}</span>
 			</div>
 
-			{#if activeCluster}
-				<div class="meta-cluster" style="--cluster-color: {activeCluster.color}; view-transition-name: item-cluster">
+			{#if data.cluster}
+				<div class="meta-cluster" style="--cluster-color: {data.cluster.color}; view-transition-name: item-cluster">
 					<span class="cluster-dot"></span>
-					<span class="cluster-name">{activeCluster.name}</span>
+					<span class="cluster-name">{data.cluster.name}</span>
 					<span class="cluster-confidence">
-						{Math.round((activeCluster.confidence ?? 1) * 100)}% match
+						{Math.round((data.cluster.confidence ?? 1) * 100)}% match
 					</span>
 				</div>
 			{/if}
 		</div>
 
 		<!-- Tags -->
-		{#if activeTags.length > 0}
+		{#if data.tags.length > 0}
 			<div class="tags-section">
-				{#each activeTags as tag (tag.id)}
+				{#each data.tags as tag (tag.id)}
 					<span class="tag" class:tag-ai={tag.source === 'ai'}>
 						{tag.name}
 					</span>
@@ -170,28 +195,19 @@
 		{/if}
 
 		<!-- Note -->
-		{#if activeItem.note && activeItem.type !== 'quote'}
+		{#if data.item.note && data.item.type !== 'quote'}
 			<div class="note-section">
 				<h3 class="section-label">Note</h3>
-				<p class="note-text">{activeItem.note}</p>
+				<p class="note-text">{data.item.note}</p>
 			</div>
 		{/if}
 
-		<!-- Exploration -->
-		{#if explorationTrail.length > 0}
-			<ExplorationBreadcrumbs
-				trail={explorationTrail}
-				onnavigate={handleBreadcrumbNavigate}
-			/>
-		{/if}
-
-		<div class="exploration-section">
-			<ExplorationPaths
-				itemId={exploringItemId ?? data.item.id}
-				initialSemantic={!exploringItemId && data.similarItems?.length > 0 ? data.similarItems : undefined}
-				oncenter={handleExplore}
-			/>
-		</div>
+		<!-- Dissect -->
+		<DissectSection
+			itemId={data.item.id}
+			dissectedAt={data.dissectedAt}
+			initialFragments={data.fragments}
+		/>
 	</main>
 </div>
 
@@ -212,6 +228,9 @@
 		background: rgba(0, 0, 0, 0.75);
 		backdrop-filter: blur(16px);
 		border-bottom: 1px solid var(--border-subtle);
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
 	}
 
 	.back-link {
@@ -226,6 +245,57 @@
 
 	.back-link:hover {
 		color: var(--text-primary);
+	}
+
+	.top-bar-actions {
+		display: flex;
+		align-items: center;
+		gap: var(--space-xs);
+	}
+
+	.delete-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		padding: 5px 8px;
+		border: none;
+		border-radius: var(--radius-sm);
+		background: transparent;
+		color: var(--text-tertiary);
+		font-family: var(--font-body);
+		font-size: var(--text-xs);
+		cursor: pointer;
+		transition: color var(--duration-fast) var(--ease-out),
+			background var(--duration-fast) var(--ease-out);
+	}
+
+	.delete-btn:hover {
+		color: var(--cluster-vermillion);
+		background: rgba(213, 94, 0, 0.08);
+	}
+
+	.delete-btn--confirm {
+		color: var(--cluster-vermillion);
+		background: rgba(213, 94, 0, 0.12);
+		padding: 5px 12px;
+	}
+
+	.delete-btn--confirm:hover {
+		background: rgba(213, 94, 0, 0.2);
+	}
+
+	.delete-btn--confirm:disabled {
+		opacity: 0.5;
+		cursor: wait;
+	}
+
+	.delete-btn--cancel {
+		color: var(--text-tertiary);
+	}
+
+	.delete-btn--cancel:hover {
+		color: var(--text-secondary);
+		background: rgba(255, 255, 255, 0.04);
 	}
 
 	/* ── Content ──────────────────────────────────── */
@@ -248,6 +318,32 @@
 		max-height: 520px;
 		object-fit: contain;
 		background: var(--bg-surface-1);
+	}
+
+	/* ── Hero: Video ─────────────────────────────── */
+	.hero-video-wrap {
+		position: relative;
+		border-radius: var(--radius-lg);
+		overflow: hidden;
+		margin-bottom: var(--space-lg);
+		aspect-ratio: 16 / 9;
+		background: var(--bg-surface-1);
+	}
+
+	.hero-video-wrap iframe {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		border: none;
+	}
+
+	.video-description {
+		font-size: var(--text-sm);
+		color: var(--text-secondary);
+		line-height: var(--leading-normal);
+		margin-bottom: var(--space-lg);
 	}
 
 	/* ── Hero: Quote ─────────────────────────────── */
@@ -407,13 +503,6 @@
 	.note-text {
 		font-size: var(--text-base);
 		color: var(--text-secondary);
-	}
-
-	/* ── Exploration ────────────────────────────── */
-	.exploration-section {
-		margin-top: var(--space-2xl);
-		padding-top: var(--space-xl);
-		border-top: 1px solid var(--border-subtle);
 	}
 
 	/* ── Responsive ──────────────────────────────── */

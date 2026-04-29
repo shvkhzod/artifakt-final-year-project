@@ -20,17 +20,15 @@
 - **NavBar.svelte** — Fixed top nav with sliding pill indicator, mobile hamburger menu
 - **SearchOverlay.svelte** — Cmd+K search with context-aware scoping, grouped results by cluster, relative dates, context pills
 - **QuickAddModal.svelte** — 3-tab modal (Link/Text/Image) with drag-drop
-- **ExplorationPaths.svelte** — 3-lane horizontal scroll (semantic/cluster/temporal neighbors)
-- **ExplorationBreadcrumbs.svelte** — Exploration trail with backtracking
 - **ImageCard.svelte**, **QuoteCard.svelte**, **ArticleCard.svelte** — Typed card components
 - **index.ts** — Barrel re-export
 
 ## Phase 2: Data Layer (Complete)
 
 ### Database
-- `src/lib/server/db/schema.ts` — Drizzle ORM schema: items (clip_embedding 1024d, content_embedding 1024d, search_text tsvector, embeddingStatus, aiCaption), clusters (with source 'ai'/'user'), item_clusters, tags, item_tags, insights, cluster_runs. Parameterized pgVector type factory.
+- `src/lib/server/db/schema.ts` — Drizzle ORM schema: items (clip_embedding 1024d, content_embedding 1024d, search_text tsvector, embeddingStatus, aiCaption, dissectedAt), clusters (with source 'ai'/'user'), item_clusters, tags, item_tags, insights, cluster_runs, fragments. Parameterized pgVector type factory.
 - `src/lib/server/db/index.ts` — PostgreSQL connection with 2s timeout, availability caching (isDbAvailable)
-- `src/lib/server/db/queries.ts` — Typed query helpers: CRUD, hybrid search (vector + keyword), KNN with cluster joins, temporal neighbors, embedding/search_text management, stripEmbeddings utility
+- `src/lib/server/db/queries.ts` — Typed query helpers: CRUD, hybrid search (vector + keyword), KNN with cluster joins, embedding/search_text management, fragment CRUD, stripEmbeddings utility
 - `src/lib/server/db/seed.ts` — 20 sample items, 4 clusters (source: 'user'), 8 tags
 
 ### API Routes
@@ -38,7 +36,10 @@
 - `GET /api/items` — List items with filters, embeddings stripped
 - `GET /api/items/[id]` — Single item, embeddings stripped
 - `DELETE /api/items/[id]` — Delete item
-- `GET /api/items/[id]/related` — Branching paths: semantic, cluster, temporal lanes
+- `POST /api/items/[id]/dissect` — AI decomposition into fragments (idempotent, supports ?force=true)
+- `GET /api/items/[id]/fragments` — List persisted fragments
+- `DELETE /api/items/[id]/fragments/[fid]` — Remove a single fragment
+- `POST /api/items/[id]/fragments/[fid]/promote` — Promote fragment to standalone library item
 - `GET /api/search` — Hybrid search (semantic + keyword) with clusterId/date scoping, groupByCluster
 - `GET /api/clusters` — Cluster data with item assignments
 - `GET /api/timeline` — Weekly aggregated stream data
@@ -58,7 +59,7 @@
 ### Captioning (`src/lib/server/ai/captioning.ts`)
 - Google Gemma 3 27B via OpenRouter for image descriptions
 - Object-first prompt: lists concrete visible items (objects, text, symbols) before mood/style
-- Structured format: OBJECTS → TEXT → STYLE → CONTEXT
+- Structured format: OBJECTS, TEXT, STYLE, CONTEXT
 - 600 token limit, images resized to 512px for API
 
 ### Search (`src/routes/api/search/+server.ts`)
@@ -73,6 +74,14 @@
 - **assign.ts** — Single-item KNN assignment using clip_embedding (K=5, cosine similarity, confidence scoring)
 - **recluster.ts** — Full agglomerative re-clustering via ml-hclust, user cluster protection, centroid-based naming samples, color rotation
 - **naming.ts** — LLM cluster naming via OpenRouter API (multimodal vision for image clusters)
+
+### Dissect Engine (`src/lib/server/ai/dissect.ts`)
+- AI decomposition of any saved item into 4-12 typed fragments
+- Uses Gemini Flash via OpenRouter for structured extraction
+- Content-type-aware taxonomy: articles produce arguments/concepts/entities/quotes/references/tensions; images produce subjects/palettes/compositions/styles/references/typography; quotes produce themes/concepts/tensions/implications
+- Multimodal: sends images as base64 for visual analysis
+- Anti-slop prompt: museum-label voice, bans vague language, enforces concrete descriptions
+- JSON parsing with validation, category filtering, length enforcement
 
 ### Pipeline
 - **pipeline.ts** — Orchestrator: embed (clip + content) → update search_text → assign → maybe recluster (all non-blocking, error-isolated). Skips items with <10 chars content.
@@ -102,20 +111,29 @@
 - Search context: scopes to selected time range
 
 ### Item Detail (`src/routes/item/[id]/+page.svelte`)
-- Type-specific hero (image/quote/article)
+- Type-specific hero (image/quote/article/video)
 - Meta row with cluster pill, confidence, tags
-- In-place exploration mode: click related items to drift, breadcrumb trail, URL updates via replaceState
-- ExplorationPaths: 3 lanes (semantic/cluster/temporal)
+- Dissect section: AI decomposition into browsable fragments grouped by category
+- Fragment actions: promote to library item, find similar via search, remove
 - View transition morph back to Library
-- Demo data fallback when DB unavailable
 
 ## Phase 5: View Transitions (Complete)
 
-- **Library ↔ Item Detail**: Hero morph (card image/content → detail hero), bidirectional
+- **Library <-> Item Detail**: Hero morph (card image/content -> detail hero), bidirectional
 - **Inter-page slides**: Directional slide based on nav order (forward = left, backward = right)
 - **Navbar**: Fixed during transitions (view-transition-name: navbar), sliding pill indicator
 - **Progressive enhancement**: no-op on unsupported browsers
 - **Reduced motion**: all transitions resolve instantly
+
+## Phase 6: Dissect (Complete)
+
+- **AI Engine**: LLM decomposition of items into typed fragments (4-12 per item) via Gemini Flash
+- **Fragment taxonomy**: Content-type-specific categories — articles yield arguments, concepts, entities; images yield subjects, palettes, compositions, styles; quotes yield themes, tensions, implications
+- **Persistence**: `fragments` table with cascade delete, `dissected_at` timestamp on items for idempotency
+- **API**: 4 endpoints — dissect (POST), list fragments (GET), delete fragment (DELETE), promote fragment to item (POST)
+- **UI**: DissectSection container with 4 states (idle/loading/loaded/error), FragmentCard, PaletteFragment (color swatches), FragmentCategory (grouped grid), shimmer loading skeleton
+- **Fragment actions**: Save as standalone library item (triggers full AI pipeline), find similar via search overlay, remove individual fragments
+- **Re-dissect**: Force mode deletes existing fragments and regenerates
 
 ## Specs
 - `docs/superpowers/specs/2026-03-18-ai-embedding-clustering-design.md`
@@ -125,6 +143,7 @@
 ## Plans
 - `docs/superpowers/plans/2026-03-18-ai-embedding-clustering.md`
 - `docs/superpowers/plans/2026-03-18-exploration-search.md`
+- `docs/superpowers/plans/2026-03-29-dissect.md`
 
 ## What's Next
 - AI-generated insights (taste shifts, new interest detection, milestones)

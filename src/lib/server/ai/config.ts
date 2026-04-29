@@ -11,10 +11,23 @@ export const AI_CONFIG = {
   },
   clustering: {
     assignmentK: 5,
-    assignmentThreshold: 0.65,
+    assignmentThreshold: 0.55,
+    reclusterSimilarityThreshold: 0.65,
     reclusterInterval: 5,
     minClusterSize: 2,
+    minItemsForClustering: 10,
+    maxClustersRatio: 3,
     namingSampleSize: 8,
+  },
+  get arena() {
+    return {
+      accessToken: env.ARENA_ACCESS_TOKEN || '',
+    };
+  },
+  get tumblr() {
+    return {
+      apiKey: env.TUMBLR_API_KEY || '',
+    };
   },
   get openrouter() {
     return {

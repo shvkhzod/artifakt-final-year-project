@@ -4,6 +4,7 @@
 	import type { ItemType } from '$lib/utils/types';
 	import * as appStore from '$lib/stores/appStore.svelte';
 	import EmptyState from '$lib/components/shared/EmptyState.svelte';
+	import { isYouTubeUrl, extractYouTubeId, youtubeThumbnailUrl } from '$lib/utils/youtube';
 
 	let prefersReducedMotion = false;
 	let canHover = false;
@@ -83,47 +84,7 @@
 		}
 	}
 
-	// ── Organize ──────────────────────────────────
-	let organizing = $state(false);
 
-	async function handleOrganize() {
-		organizing = true;
-		try {
-			// Reprocess any items missing CLIP embeddings
-			const res = await fetch('/api/items');
-			if (!res.ok) throw new Error('Failed to fetch items');
-			const allItems = await res.json();
-			const pending = allItems.filter((i: any) => i.embeddingStatus !== 'complete');
-
-			if (pending.length > 0) {
-				for (const item of pending) {
-					await fetch(`/api/items/${item.id}`, { method: 'PATCH' });
-				}
-				// Poll until all embeddings are complete (max 60s)
-				for (let i = 0; i < 30; i++) {
-					await new Promise((r) => setTimeout(r, 2000));
-					const check = await fetch('/api/items');
-					if (!check.ok) continue;
-					const current = await check.json();
-					const stillPending = current.filter((i: any) => i.embeddingStatus !== 'complete' && i.embeddingStatus !== 'failed');
-					if (stillPending.length === 0) break;
-				}
-			}
-
-			// Trigger reclustering
-			const clusterRes = await fetch('/api/clusters', { method: 'POST' });
-			if (clusterRes.ok) {
-				appStore.showToast('Collection organized', 'success');
-				window.location.reload();
-			} else {
-				appStore.showToast('Organize failed', 'error');
-			}
-		} catch {
-			appStore.showToast('Organize failed', 'error');
-		} finally {
-			organizing = false;
-		}
-	}
 
 	// ── Drag and Drop ─────────────────────────────
 	let isDragging: boolean = $state(false);
@@ -193,8 +154,10 @@
 
 		try {
 			if (text && isURL(text)) {
-				await saveFromInput({ url: text.trim(), type: 'article' });
-				appStore.showToast('Link saved to library', 'success');
+				const trimmed = text.trim();
+				const type = isYouTubeUrl(trimmed) ? 'video' : 'article';
+				await saveFromInput({ url: trimmed, type });
+				appStore.showToast(type === 'video' ? 'Video saved to library' : 'Link saved to library', 'success');
 			} else if (html && html.trim().length > 0) {
 				await saveFromInput({ content: text || html, type: 'quote' });
 				appStore.showToast('Text saved to library', 'success');
@@ -332,48 +295,34 @@
 </script>
 
 <svelte:head>
-	<title>Aina — Library</title>
+	<title>Artifakt — Library</title>
 </svelte:head>
 
-<!-- Cluster filter pills -->
-<div class="cluster-filters">
-	<button
-		class="filter-pill"
-		class:active={!appStore.getSelectedClusterId()}
-		onclick={() => appStore.selectCluster(null)}
-	>
-		All
-	</button>
-	{#each allClusters as cluster (cluster.id)}
+{#if allClusters.length > 0}
+	<!-- Cluster filter pills -->
+	<div class="cluster-filters">
 		<button
 			class="filter-pill"
-			class:active={appStore.getSelectedClusterId() === cluster.id}
-			style="--pill-accent: {cluster.color}"
-			onclick={() => appStore.selectCluster(appStore.getSelectedClusterId() === cluster.id ? null : cluster.id)}
+			class:active={!appStore.getSelectedClusterId()}
+			onclick={() => appStore.selectCluster(null)}
 		>
-			<span class="filter-dot" style="background: {cluster.color}"></span>
-			{cluster.name}
+			All
 		</button>
-	{/each}
-	{#if gridItems.length > 0}
-		<button
-			class="filter-pill organize-btn"
-			onclick={handleOrganize}
-			disabled={organizing}
-			title="Organize your collection into clusters"
-		>
-			{#if organizing}
-				<span class="organize-spinner"></span>
-			{:else}
-				<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-					<circle cx="12" cy="12" r="3" />
-					<path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
-				</svg>
-			{/if}
-			{organizing ? 'Organizing...' : 'Organize'}
-		</button>
-	{/if}
-</div>
+		{#each allClusters as cluster (cluster.id)}
+			<button
+				class="filter-pill"
+				class:active={appStore.getSelectedClusterId() === cluster.id}
+				style="--pill-accent: {cluster.color}"
+				onclick={() => appStore.selectCluster(appStore.getSelectedClusterId() === cluster.id ? null : cluster.id)}
+			>
+				<span class="filter-dot" style="background: {cluster.color}"></span>
+				{cluster.name}
+			</button>
+		{/each}
+	</div>
+{:else if gridItems.length > 0}
+	<p class="taste-hint">Save more items to discover your taste patterns</p>
+{/if}
 
 <!-- Grid Library -->
 <div
@@ -392,6 +341,7 @@
 			{@const clusterCol = item.cluster?.color || 'rgba(255,255,255,0.06)'}
 			<button
 				class="grid-card"
+				class:card-type-video={item.type === 'video'}
 				class:card-type-image={item.type === 'image' || item.type === 'screenshot'}
 				class:card-type-quote={item.type === 'quote'}
 				class:card-type-article={item.type === 'article'}
@@ -400,7 +350,27 @@
 				use:reveal={i}
 				use:tilt
 			>
-				{#if item.type === 'image' || item.type === 'screenshot'}
+				{#if item.type === 'video'}
+					{@const videoId = item.url ? extractYouTubeId(item.url) : null}
+					<div class="card-video" style={isTransitioning ? 'view-transition-name: item-hero' : ''}>
+						<img
+							src={item.thumbnailUrl || (videoId ? youtubeThumbnailUrl(videoId) : '')}
+							alt={item.title || 'Saved video'}
+							loading="lazy"
+							draggable="false"
+						/>
+						<div class="video-play" aria-hidden="true">
+							<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+						</div>
+						<span class="image-edge" aria-hidden="true"></span>
+					</div>
+					{#if item.title}
+						<span class="video-caption" style={isTransitioning ? 'view-transition-name: item-title' : ''}>{item.title}</span>
+					{/if}
+					{#if item.content}
+						<span class="video-desc">{item.content}</span>
+					{/if}
+				{:else if item.type === 'image' || item.type === 'screenshot'}
 					<div class="card-image" style={isTransitioning ? 'view-transition-name: item-hero' : ''}>
 						<img
 							src={item.url || item.thumbnailUrl}
@@ -507,41 +477,26 @@
 		background: rgba(255, 255, 255, 0.08);
 	}
 
-	.organize-btn {
-		margin-left: var(--space-2xs);
-		border-left: 1px solid var(--border-subtle);
-		padding-left: 14px;
-		gap: 5px;
-		color: var(--text-ghost);
-	}
-
-	.organize-btn:hover {
-		color: var(--accent-sage);
-	}
-
-	.organize-btn:disabled {
-		opacity: 0.5;
-		cursor: wait;
-	}
-
-	.organize-spinner {
-		width: 10px;
-		height: 10px;
-		border: 1.5px solid var(--text-ghost);
-		border-top-color: var(--accent-sage);
-		border-radius: var(--radius-full);
-		animation: spin 600ms linear infinite;
-	}
-
-	@keyframes spin {
-		to { transform: rotate(360deg); }
-	}
-
 	.filter-dot {
 		width: 6px;
 		height: 6px;
 		border-radius: var(--radius-full);
 		flex-shrink: 0;
+	}
+
+	/* ── Taste Hint (no clusters yet) ───────────── */
+	.taste-hint {
+		position: fixed;
+		top: calc(var(--navbar-height) + var(--space-xl));
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: var(--z-panel);
+		font-family: var(--font-body);
+		font-size: var(--text-xs);
+		color: var(--text-ghost);
+		letter-spacing: 0.02em;
+		white-space: nowrap;
+		margin: 0;
 	}
 
 	/* ── Library ─────────────────────────────────── */
@@ -659,6 +614,84 @@
 
 	.card-type-image:hover .image-caption {
 		color: var(--text-tertiary);
+	}
+
+	/* ─────────────────────────────────────────────
+	   VIDEO CARDS
+	   Thumbnail with a centered play icon.
+	   Shares image card structure with a play
+	   indicator layered on top.
+	   ───────────────────────────────────────────── */
+	.card-video {
+		position: relative;
+		line-height: 0;
+		border-radius: 4px;
+		overflow: hidden;
+		box-shadow: inset 0 -40px 40px -30px rgba(0, 0, 0, 0.25);
+	}
+
+	.card-video img {
+		width: 100%;
+		display: block;
+		object-fit: cover;
+		aspect-ratio: 16 / 9;
+		transition: transform 600ms var(--ease-out);
+	}
+
+	.video-play {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		width: 44px;
+		height: 44px;
+		border-radius: var(--radius-full);
+		background: rgba(0, 0, 0, 0.55);
+		backdrop-filter: blur(4px);
+		display: grid;
+		place-items: center;
+		color: #fff;
+		opacity: 0.85;
+		transition: opacity 300ms var(--ease-out), transform 300ms var(--ease-out);
+	}
+
+	.grid-card:hover .video-play {
+		opacity: 1;
+		transform: translate(-50%, -50%) scale(1.08);
+	}
+
+	.grid-card:hover .card-video img {
+		transform: scale(1.025);
+	}
+
+	.video-caption {
+		display: block;
+		padding: 8px 2px 0;
+		font-family: var(--font-body);
+		font-size: 11px;
+		letter-spacing: 0.02em;
+		color: var(--text-ghost);
+		transition: color 400ms var(--ease-out);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.grid-card:hover .video-caption {
+		color: var(--text-tertiary);
+	}
+
+	.video-desc {
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		padding: 4px 2px 0;
+		font-family: var(--font-body);
+		font-size: 11px;
+		line-height: 1.5;
+		color: var(--text-ghost);
 	}
 
 	/* ─────────────────────────────────────────────

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import type { Item, Cluster } from '$lib/utils/types';
+	import ArenaCard from '$lib/components/shared/ArenaCard.svelte';
+	import type { ArenaBlock } from '$lib/utils/arena.types';
 
 	interface Props {
 		item: Item | null;
@@ -50,6 +52,91 @@
 		screenshot:
 			'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5zm2 0v14h14V5H5zm2 2h3v3H7V7zm7 0h3v3h-3V7z',
 	};
+
+	/* ── Explore (Are.na) ─────────────────────────── */
+	let arenaEnabled = $state(true);
+	let exploreLoading = $state(false);
+	let exploreResults = $state<ArenaBlock[]>([]);
+	let exploreError = $state('');
+	let exploreTriggered = $state(false);
+
+	let channelView = $state<{ slug: string; title: string } | null>(null);
+	let channelBlocks = $state<ArenaBlock[]>([]);
+	let channelLoading = $state(false);
+
+	$effect(() => {
+		if (item) {
+			arenaEnabled = true;
+			exploreTriggered = false;
+			exploreResults = [];
+			exploreError = '';
+			channelView = null;
+		}
+	});
+
+	async function handleExplore() {
+		if (!item || exploreLoading) return;
+		exploreTriggered = true;
+		exploreLoading = true;
+		exploreError = '';
+
+		try {
+			const res = await fetch('/api/explore', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ itemId: item.id }),
+			});
+
+			if (res.status === 501) {
+				arenaEnabled = false;
+				return;
+			}
+			if (res.status === 425) {
+				exploreError = 'Processing... try again shortly';
+				return;
+			}
+			if (res.status === 429) {
+				exploreError = 'Slow down — try again in a minute';
+				return;
+			}
+			if (!res.ok) {
+				exploreError = "Couldn't reach Are.na";
+				return;
+			}
+
+			const data = await res.json();
+			exploreResults = data.results ?? [];
+			if (exploreResults.length === 0) {
+				exploreError = 'No discoveries found';
+			}
+		} catch {
+			exploreError = "Couldn't reach Are.na";
+		} finally {
+			exploreLoading = false;
+		}
+	}
+
+	async function handleSeeChannel(slug: string) {
+		const ch = exploreResults.flatMap(b => b.channels).find(c => c.slug === slug);
+		channelView = { slug, title: ch?.title || slug };
+		channelLoading = true;
+		try {
+			const res = await fetch(`/api/explore/channel/${encodeURIComponent(slug)}`);
+			if (res.ok) {
+				const data = await res.json();
+				channelBlocks = data.blocks ?? [];
+			}
+		} catch {
+			channelBlocks = [];
+		} finally {
+			channelLoading = false;
+		}
+	}
+
+	function backToExploreResults() {
+		channelView = null;
+		channelBlocks = [];
+	}
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -168,6 +255,45 @@
 					<path d="m9 18 6-6-6-6" />
 				</svg>
 			</button>
+
+			<!-- Explore (Are.na) -->
+			{#if arenaEnabled}
+				<button class="panel-btn explore-btn" onclick={handleExplore} disabled={exploreLoading}>
+					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+						<circle cx="12" cy="12" r="10" />
+						<polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+					</svg>
+					{exploreLoading ? 'Searching...' : 'Explore'}
+				</button>
+			{/if}
+
+			{#if exploreTriggered}
+				<div class="explore-results">
+					{#if exploreLoading}
+						<div class="explore-shimmer">
+							{#each Array(3) as _}
+								<div class="explore-shimmer-card"></div>
+							{/each}
+						</div>
+					{:else if exploreError}
+						<p class="explore-error">{exploreError}</p>
+					{:else if channelView}
+						<button class="explore-back" onclick={backToExploreResults}>&larr; Back to results</button>
+						<p class="explore-channel-title">{channelView.title}</p>
+						{#if channelLoading}
+							<p class="explore-loading">Loading channel...</p>
+						{:else}
+							{#each channelBlocks as block (block.arenaId)}
+								<ArenaCard {block} onseechannel={handleSeeChannel} />
+							{/each}
+						{/if}
+					{:else}
+						{#each exploreResults as block (block.arenaId)}
+							<ArenaCard {block} onseechannel={handleSeeChannel} />
+						{/each}
+					{/if}
+				</div>
+			{/if}
 		</div>
 	{/if}
 </aside>
@@ -439,5 +565,109 @@
 		.detail-panel.open {
 			transform: translateY(0);
 		}
+	}
+
+	/* ── Explore ──────────────────────────────────── */
+	.explore-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		width: 100%;
+		padding: 10px;
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-md);
+		background: transparent;
+		color: var(--text-secondary);
+		font-family: var(--font-body);
+		font-size: var(--text-sm);
+		font-weight: 500;
+		cursor: pointer;
+		margin-top: var(--space-xs);
+		transition: border-color var(--duration-fast) var(--ease-out),
+			color var(--duration-fast) var(--ease-out);
+	}
+
+	.explore-btn:hover:not(:disabled) {
+		border-color: var(--accent-sage);
+		color: var(--accent-sage);
+	}
+
+	.explore-btn:disabled {
+		opacity: 0.5;
+		cursor: wait;
+	}
+
+	.explore-results {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-sm);
+		margin-top: var(--space-md);
+		padding-top: var(--space-md);
+		border-top: 1px solid var(--border-subtle);
+	}
+
+	.explore-results :global(.arena-card) {
+		width: 100%;
+	}
+
+	.explore-results :global(.arena-card__image) {
+		height: 120px;
+	}
+
+	.explore-shimmer {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-sm);
+	}
+
+	.explore-shimmer-card {
+		width: 100%;
+		height: 120px;
+		border-radius: var(--radius-sm);
+		background: var(--bg-surface-2);
+		animation: shimmer-pulse 1.2s var(--ease-in-out) infinite;
+	}
+
+	.explore-error {
+		font-family: var(--font-body);
+		font-size: var(--text-xs);
+		color: var(--text-ghost);
+		margin: 0;
+	}
+
+	.explore-back {
+		font-family: var(--font-body);
+		font-size: 10px;
+		color: var(--text-tertiary);
+		background: none;
+		border: none;
+		cursor: pointer;
+		padding: 0;
+		transition: color var(--duration-fast) var(--ease-out);
+	}
+
+	.explore-back:hover {
+		color: var(--text-primary);
+	}
+
+	.explore-channel-title {
+		font-family: var(--font-body);
+		font-size: var(--text-sm);
+		font-weight: 500;
+		color: var(--text-primary);
+		margin: 0 0 var(--space-xs);
+	}
+
+	.explore-loading {
+		font-family: var(--font-body);
+		font-size: var(--text-xs);
+		color: var(--text-ghost);
+		margin: 0;
+	}
+
+	@keyframes shimmer-pulse {
+		0%, 100% { opacity: 0.3; }
+		50% { opacity: 0.6; }
 	}
 </style>

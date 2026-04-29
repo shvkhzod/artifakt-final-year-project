@@ -53,10 +53,10 @@ async function nameWithText(
       model,
       messages: [{
         role: 'user',
-        content: `These saved items form a natural group:\n\n${descriptions}\n\nGive this collection a short, evocative name (2-4 words). No generic labels like "Miscellaneous" or "Various Topics". Return only the name, nothing else.`,
+        content: `These saved items form a natural group:\n\n${descriptions}\n\nGive this collection a short, literal, descriptive name (2-3 words) that says what these items are about. Be specific and plain — like "Film Photography", "UI Design", "Architecture", "Street Fashion". No poetry, no metaphors, no mood words. Return only the name, nothing else.`,
       }],
       max_tokens: 20,
-      temperature: 0.7,
+      temperature: 0.3,
     }),
   });
 
@@ -102,7 +102,7 @@ async function nameWithVision(
 
   contentParts.push({
     type: 'text',
-    text: 'These images were saved together as a collection. Based on what you see, give this collection a short, evocative name (2-4 words) that captures the visual theme or mood. No generic labels. Return only the name, nothing else.',
+    text: 'These images were saved together as a collection. Based on what you see, give this collection a short, literal, descriptive name (2-3 words) that says what the subject matter is. Be specific and plain — like "Film Photography", "3D Renders", "Architecture", "Street Fashion". No poetry, no metaphors, no mood words. Return only the name, nothing else.',
   });
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -115,7 +115,7 @@ async function nameWithVision(
       model: VISION_MODEL,
       messages: [{ role: 'user', content: contentParts }],
       max_tokens: 20,
-      temperature: 0.7,
+      temperature: 0.3,
     }),
   });
 
@@ -131,7 +131,7 @@ async function nameWithVision(
 
 const MAX_IMAGE_BYTES = 500_000; // 500KB max for API
 
-async function imageToBase64(imageUrl: string): Promise<string | null> {
+export async function imageToBase64(imageUrl: string): Promise<string | null> {
   try {
     let buffer: Buffer;
 

@@ -2,6 +2,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import * as appStore from '$lib/stores/appStore.svelte';
 	import { createFocusTrap } from '$lib/utils/focusTrap';
+	import { isYouTubeUrl } from '$lib/utils/youtube';
 
 	type Tab = 'link' | 'text' | 'image';
 
@@ -148,13 +149,14 @@
 
 		try {
 			if (activeTab === 'link') {
+				const url = linkUrl.trim();
 				const response = await fetch('/api/items', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
-						url: linkUrl.trim(),
+						url,
 						title: linkPreview?.title || null,
-						type: 'article',
+						type: isYouTubeUrl(url) ? 'video' : 'article',
 					}),
 				});
 				if (!response.ok) throw new Error('Save failed');
