@@ -11,9 +11,9 @@ export const AI_CONFIG = {
   },
   clustering: {
     assignmentK: 5,
-    assignmentThreshold: 0.55,
-    reclusterSimilarityThreshold: 0.65,
-    reclusterInterval: 5,
+    assignmentThreshold: 0.40,
+    reclusterSimilarityThreshold: 0.50,
+    reclusterInterval: 1,
     minClusterSize: 2,
     minItemsForClustering: 10,
     maxClustersRatio: 3,

@@ -44,26 +44,42 @@ export class ApiEmbeddingProvider implements EmbeddingProvider {
 	}
 
 	private async callJina(model: string, input: Record<string, string>[]): Promise<number[]> {
-		const response = await fetch(JINA_API_URL, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Authorization': `Bearer ${AI_CONFIG.jina.apiKey}`,
-			},
-			body: JSON.stringify({
-				model,
-				input,
-				normalized: true,
-			}),
-		});
+		// Retry with exponential backoff on 429 (rate limit). Jina's window is 60s,
+		// so wait 8s → 20s → 40s → fail. Keeps demos resilient to brief bursts.
+		const delays = [8_000, 20_000, 40_000];
 
-		if (!response.ok) {
+		for (let attempt = 0; attempt <= delays.length; attempt++) {
+			const response = await fetch(JINA_API_URL, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${AI_CONFIG.jina.apiKey}`,
+				},
+				body: JSON.stringify({
+					model,
+					input,
+					normalized: true,
+				}),
+			});
+
+			if (response.ok) {
+				const result = (await response.json()) as JinaResponse;
+				return result.data[0].embedding;
+			}
+
 			const body = await response.text();
+
+			if (response.status === 429 && attempt < delays.length) {
+				const wait = delays[attempt];
+				console.warn(`Jina 429: waiting ${wait / 1000}s before retry ${attempt + 1}/${delays.length}`);
+				await new Promise((r) => setTimeout(r, wait));
+				continue;
+			}
+
 			throw new Error(`Jina API error ${response.status}: ${body}`);
 		}
 
-		const result = (await response.json()) as JinaResponse;
-		return result.data[0].embedding;
+		throw new Error('Jina API: exhausted retries');
 	}
 
 	private async buildImageInput(input: string): Promise<Record<string, string>> {

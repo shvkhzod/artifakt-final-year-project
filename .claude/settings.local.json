@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where pdftotext *)",
+      "Bash(where pdftoppm *)",
+      "Bash(node -e \"console.log\\(require.resolve\\('pdf-parse'\\)\\)\")",
+      "Bash(\"C:/Program Files/Git/mingw64/bin/pdftotext.exe\" -layout \"C:/Another Disk/The FIles/Projects/digitalinsta/finalsss/dissertation/4210053-csi-6-csp.pdf\" \"C:/Another Disk/The FIles/Projects/digitalinsta/finalsss/dissertation/dissertation.txt\")",
+      "Bash(\"C:/Program Files/Git/mingw64/bin/pdftotext.exe\" \"C:/Another Disk/The FIles/Projects/digitalinsta/finalsss/dissertation/4210053-csi-6-csp.pdf\" \"C:/Another Disk/The FIles/Projects/digitalinsta/finalsss/dissertation/dissertation_raw.txt\")",
+      "Bash(\"C:/Program Files/Git/mingw64/bin/pdfinfo.exe\" \"C:/Another Disk/The FIles/Projects/digitalinsta/finalsss/dissertation/4210053-csi-6-csp.pdf\")",
+      "Bash(\"C:/Program Files/Git/mingw64/bin/pdftotext.exe\" -f 16 -l 25 \"C:/Another Disk/The FIles/Projects/digitalinsta/finalsss/dissertation/4210053-csi-6-csp.pdf\" \"C:/Another Disk/The FIles/Projects/digitalinsta/finalsss/dissertation/diss_p16-25.txt\")",
+      "Bash(\"C:/Program Files/Git/mingw64/bin/pdftotext.exe\" -f 35 -l 65 \"C:/Another Disk/The FIles/Projects/digitalinsta/finalsss/dissertation/4210053-csi-6-csp.pdf\" \"C:/Another Disk/The FIles/Projects/digitalinsta/finalsss/dissertation/diss_p35-65.txt\")",
+      "Bash(\"C:/Program Files/Git/mingw64/bin/pdftotext.exe\" -f 26 -l 35 \"C:/Another Disk/The FIles/Projects/digitalinsta/finalsss/dissertation/4210053-csi-6-csp.pdf\" \"C:/Another Disk/The FIles/Projects/digitalinsta/finalsss/dissertation/diss_p26-35.txt\")"
+    ]
+  }
+}

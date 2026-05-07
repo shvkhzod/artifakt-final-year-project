@@ -39,7 +39,7 @@
 </script>
 
 <svelte:head>
-	<title>Login — Aina</title>
+	<title>Login — Artifakt</title>
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
 	<link
@@ -54,7 +54,7 @@
 
 	<form class="login-card" class:shake onsubmit={handleSubmit}>
 		<header class="login-header">
-			<h1 class="login-title">Aina</h1>
+			<h1 class="login-title">Artifakt</h1>
 			<p class="login-subtitle">Sign in to your collection</p>
 		</header>
 
